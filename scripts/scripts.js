@@ -16,92 +16,11 @@ import {
   toClassName,
   toCamelCase,
 } from './aem.js';
-
-/** AEM Universal Editor iframe loads this origin; skip Target so at.js does not fight UE/CSP. */
-const isUePreviewHost = (hostname = window.location.hostname) => (
-  /\.(?:stage-ue|ue)\.da\.live$/.test(hostname)
-);
-
-/**
- * Load at.js early so other code can rely on window.adobe.target, but do not apply
- * page-load offers until after blocks run — e.g. target-offer creates `.target-offer__slot`
- * in its init; VEC selectors often point at that hook.
- */
-async function ensureTargetAtJs() {
-  if (isUePreviewHost()) return;
-  const targetMeta = getMetadata('target');
-  if (!targetMeta) return;
-
-  const serverDomain = getMetadata('target-server-domain')?.trim();
-  window.targetGlobalSettings = {
-    secureOnly: true,
-    overrideMboxEdgeServer: false,
-    ...(serverDomain ? { serverDomain } : {}),
-  };
-
-  try {
-    await import('../deps/at/at.js');
-  } catch (e) {
-    // eslint-disable-next-line no-console
-    console.error(e);
-  }
-}
-
-async function applyTargetPageLoad() {
-  if (isUePreviewHost()) return;
-  if (!getMetadata('target')) return;
-
-  const t = window.adobe?.target;
-  if (!t?.getOffers) return;
-
-  try {
-    const pageLoadRequest = { execute: { pageLoad: {} } };
-    const offers = await t.getOffers({ request: pageLoadRequest });
-
-    if (typeof t.applyOffers === 'function') {
-      await t.applyOffers({ request: pageLoadRequest, response: offers });
-    } else {
-      offers?.execute?.pageLoad?.options?.forEach((opt) => {
-        const payload = opt?.content?.[0];
-        if (!payload) return;
-        const { cssSelector, content } = payload;
-        if (!cssSelector || content == null) return;
-        const el = document.querySelector(cssSelector);
-        if (el) el.outerHTML = content;
-      });
-    }
-  } catch (e) {
-    // eslint-disable-next-line no-console
-    console.error(e);
-  }
-}
-
-/**
- * Legacy mbox flow (getOffer + applyOffer).
- * Opt-in: set <meta name="target-mbox-hero"> to the mbox name.
- * Optional: <meta name="target-mbox-hero-selector"> (default: .hero.block .hero-inner).
- */
-async function applyTargetHeroMboxIfConfigured() {
-  if (isUePreviewHost()) return;
-  const mbox = getMetadata('target-mbox-hero')?.trim();
-  if (!mbox) return;
-
-  const selector = getMetadata('target-mbox-hero-selector')?.trim() || '.hero.block .hero-inner';
-  const t = window.adobe?.target;
-  if (!t?.getOffer || !t?.applyOffer) return;
-
-  await new Promise((resolve) => {
-    t.getOffer({
-      mbox,
-      success(offers) {
-        const el = document.querySelector(selector);
-        if (el) t.applyOffer({ mbox, selector, offer: offers });
-        resolve();
-      },
-      error: resolve,
-    });
-  });
-}
+import {
+  isUePreviewHost,
+  loadTarget,
+  applyTargetHeroMboxIfConfigured,
+} from './target.js';
 
 /**
  * Builds hero block and prepends to main in a new section.
@@ -291,10 +210,9 @@ async function loadSidekick() {
 }
 
 async function loadPage() {
-  await ensureTargetAtJs();
   await loadEager(document);
   await loadLazy(document);
-  await applyTargetPageLoad();
+  await loadTarget();
   await applyTargetHeroMboxIfConfigured();
   loadDelayed();
   loadSidekick();
