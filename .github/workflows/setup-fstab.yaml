@@ -3,6 +3,10 @@ name: Setup fstab for new repo
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   update-fstab:
@@ -15,7 +19,7 @@ jobs:
           ORG="${{ github.repository_owner }}"
           REPO="${{ github.event.repository.name }}"
           EXPECTED="https://content.da.live/$ORG/$REPO/"
-          CURRENT=$(grep -oP 'https://content\.da\.live/[^/]+/[^/]+/' fstab.yaml || true)
+          CURRENT=$(grep -o 'https://content\.da\.live/[^/]*/[^/]*/' fstab.yaml || true)
           if [ "$CURRENT" = "$EXPECTED" ]; then
             echo "fstab.yaml already up to date — nothing to do."
             exit 0
