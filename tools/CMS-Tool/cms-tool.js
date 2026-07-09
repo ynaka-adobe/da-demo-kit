@@ -5,7 +5,6 @@ const TARGET_RUNTIME = 'https://332794-868ceruleanwhale.adobeioruntime.net/api/v
 const WF_RUNTIME = 'https://3635370-144scarletlobster.adobeioruntime.net/api/v1/web/default/workfront-planning';
 const WF_DOMAIN = 'adoberm.my.workfront.com';
 const WF_CLIENT_ID = '56e219a0a1eeae8feb55c444e3d8a8b6';
-const WF_REDIRECT_URI = 'https://main--da-demo-kit--ynaka-adobe.aem.live/tools/CMS-Tool/cms-tool.html';
 
 // ── Utilities ──────────────────────────────────────────────────────────────────
 
@@ -913,8 +912,12 @@ async function showNewCampaignModal(wfProjects, sdk, onCreated) {
 
 // ── WF connect prompt ──────────────────────────────────────────────────────────
 
+// Redirect URI is the Runtime action itself — a fixed, domain-independent
+// URL registered once with Workfront. It exchanges the code and postMessages
+// the tokens back to this page's origin (passed via `state`).
 function buildWfAuthUrl() {
-  return `https://${WF_DOMAIN}/integrations/oauth2/authorize?client_id=${WF_CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(WF_REDIRECT_URI)}`;
+  return `https://${WF_DOMAIN}/integrations/oauth2/authorize?client_id=${WF_CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(WF_RUNTIME)}`
+    + `&state=${encodeURIComponent(location.origin)}`;
 }
 
 // ── Main app ───────────────────────────────────────────────────────────────────
@@ -1143,42 +1146,10 @@ async function buildApp(activities, wfProjects, sdk) {
   document.body.append(shell);
 }
 
-// ── WF OAuth callback handling ─────────────────────────────────────────────────
-
-async function handleWfCallback(code) {
-  document.body.innerHTML = '<div class="connect-screen"><p>Authenticating with Workfront…</p></div>';
-  try {
-    const tokens = await wfRuntimeCall({ resource: 'exchange_code', code });
-    if (tokens.access_token) {
-      wfSaveTokens(tokens);
-      history.replaceState({}, '', location.pathname);
-      if (window.opener && !window.opener.closed) {
-        try { window.opener.localStorage.setItem('cmc_wf_token', tokens.access_token); } catch {}
-        try { window.opener.postMessage({ type: 'cmc_wf_tokens', ...tokens }, location.origin); } catch {}
-        try { window.opener.location.reload(); } catch {}
-      }
-      window.close();
-      await new Promise((r) => setTimeout(r, 300));
-      document.body.innerHTML = `<div class="connect-screen">
-        <p style="color:#2d9d78;font-size:16px">✓ Connected to Workfront</p>
-        <p>You can close this tab and return to the CMC Tool.</p>
-      </div>`;
-    } else {
-      document.body.innerHTML = `<div class="connect-screen"><p style="color:#c00">Auth failed: ${esc(tokens.message || 'Unknown error')}</p></div>`;
-    }
-  } catch (err) {
-    document.body.innerHTML = `<div class="connect-screen"><p style="color:#c00">Auth error: ${esc(err.message)}</p></div>`;
-  }
-}
-
 // ── Bootstrap ──────────────────────────────────────────────────────────────────
 
 (async function init() {
   const sdk = await Promise.race([DA_SDK, new Promise((r) => setTimeout(r, 1500))]);
-
-  // WF OAuth callback
-  const params = new URLSearchParams(location.search);
-  if (params.get('code')) { await handleWfCallback(params.get('code')); return; }
 
   // Loading screen
   document.body.innerHTML = '<div class="connect-screen"><div class="spinner-wrap"><div class="spinner"></div></div><p>Loading campaigns…</p></div>';

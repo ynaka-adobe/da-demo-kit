@@ -1,12 +1,14 @@
 import DA_SDK from 'https://da.live/nx/utils/sdk.js';
 
 const RUNTIME_URL = 'https://3635370-144scarletlobster.adobeioruntime.net/api/v1/web/default/workfront-planning';
+const RUNTIME_ORIGIN = new URL(RUNTIME_URL).origin;
 const WF_DOMAIN = 'aemshowcase2.my.workfront.com';
 const WF_CLIENT_ID = '56e219a0a1eeae8feb55c444e3d8a8b6';
-const REDIRECT_URI = 'https://main--da-demo-kit--ynaka-adobe.aem.live/tools/workfront/workfront.html';
 
 // ── OAuth helpers ─────────────────────────────────────────────────────────────
-const AUTH_CHANNEL = 'wf_auth_tokens';
+// Redirect URI is the Runtime action itself — a fixed, domain-independent
+// URL registered once with Workfront. The action exchanges the code and
+// postMessages the tokens back to this page's origin (passed via `state`).
 
 function storedToken() {
   const token = localStorage.getItem('wf_access_token');
@@ -35,7 +37,8 @@ async function runtimeCall(params) {
 
 function buildAuthUrl() {
   return `https://${WF_DOMAIN}/integrations/oauth2/authorize?`
-    + `client_id=${WF_CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
+    + `client_id=${WF_CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(RUNTIME_URL)}`
+    + `&state=${encodeURIComponent(location.origin)}`;
 }
 
 async function ensureToken() {
@@ -72,34 +75,16 @@ function showConnectScreen() {
     btn.textContent = 'Authorize in the new tab, then return here…';
     btn.style.background = '#888';
 
-    let done = false;
-    const finish = (tokenData) => {
-      if (done) return;
-      done = true;
-      saveTokens(tokenData);
-      location.reload();
-    };
-
-    // postMessage from same-origin popup (most reliable across partitioning)
+    // The popup navigates to Workfront, then to the Runtime relay, which
+    // postMessages the tokens back here and closes itself.
     const onMessage = (e) => {
-      if (e.origin === location.origin && e.data?.type === 'wf_tokens') {
+      if (e.origin === RUNTIME_ORIGIN && e.data?.type === 'wf_tokens') {
         window.removeEventListener('message', onMessage);
-        finish(e.data);
+        saveTokens(e.data);
+        location.reload();
       }
     };
     window.addEventListener('message', onMessage);
-
-    // BroadcastChannel fallback
-    try {
-      const bc = new BroadcastChannel(AUTH_CHANNEL);
-      bc.onmessage = (e) => { if (e.data.type === 'wf_tokens') { bc.close(); finish(e.data); } };
-    } catch {}
-
-    // localStorage poll fallback
-    const timer = setInterval(() => {
-      const t = storedToken();
-      if (t) { clearInterval(timer); finish({ access_token: t }); }
-    }, 1000);
   });
   wrap.append(title, btn);
   document.body.append(wrap);
@@ -1293,47 +1278,6 @@ document.head.append(style);
 
 (async function init() {
   await Promise.race([DA_SDK, new Promise((r) => setTimeout(r, 1500))]);
-
-  // Handle OAuth callback: ?code=...
-  const params = new URLSearchParams(location.search);
-  const code = params.get('code');
-  if (code) {
-    document.body.innerHTML = '<p class="loading">Authenticating with Workfront…</p>';
-    try {
-      const tokens = await runtimeCall({ resource: 'exchange_code', code });
-      if (tokens.access_token) {
-        saveTokens(tokens);
-        history.replaceState({}, '', location.pathname);
-        // Always try to close — works when opened via window.open()
-        // even if window.opener was cleared by cross-origin IMS navigation
-        // Write tokens directly into opener's localStorage partition (bypasses Chrome storage partitioning)
-        // and send postMessage as fallback
-        if (window.opener && !window.opener.closed) {
-          try {
-            const ttl = (Number(tokens.expires_in) || 36000) * 1000;
-            window.opener.localStorage.setItem('wf_access_token', tokens.access_token);
-            if (tokens.refresh_token) window.opener.localStorage.setItem('wf_refresh_token', tokens.refresh_token);
-            window.opener.localStorage.setItem('wf_token_expiry', String(Date.now() + ttl));
-          } catch {}
-          try { window.opener.postMessage({ type: 'wf_tokens', ...tokens }, location.origin); } catch {}
-          try { window.opener.location.reload(); } catch {}
-        }
-        window.close();
-        await new Promise((r) => setTimeout(r, 400));
-        document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;flex-direction:column;gap:12px">
-          <p style="font-size:16px;color:#2d9d78;margin:0">✓ Connected to Workfront</p>
-          <p style="font-size:13px;color:#666;margin:0">You can close this tab and return to DA.</p>
-        </div>`;
-        return;
-      } else {
-        document.body.innerHTML = `<p class="loading error">Auth failed: ${esc(tokens.message || JSON.stringify(tokens))}</p>`;
-        return;
-      }
-    } catch (err) {
-      document.body.innerHTML = `<p class="loading error">Auth error: ${esc(err.message)}</p>`;
-      return;
-    }
-  }
 
   const token = await ensureToken();
   if (!token) { showConnectScreen(); return; }

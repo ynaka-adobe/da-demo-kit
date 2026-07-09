@@ -3,11 +3,13 @@
  * Deploy the Workfront Planning Runtime action.
  *
  * Usage:
- *   DA_TOKEN=eyJ... AIO_RUNTIME_AUTH=<auth> AIO_RUNTIME_NAMESPACE=332794-868ceruleanwhale node tools/workfront/deploy.mjs
+ *   DA_TOKEN=eyJ... AIO_RUNTIME_AUTH=<auth> AIO_RUNTIME_NAMESPACE=3635370-144scarletlobster node tools/workfront/deploy.mjs
  *
  * Where to get AIO_RUNTIME_AUTH + AIO_RUNTIME_NAMESPACE:
  *   1. Go to https://developer.adobe.com/console
- *   2. Open the "868CeruleanWhale" project → Production workspace
+ *   2. Open the Adobe Developer Console project whose Runtime namespace is
+ *      "3635370-144scarletlobster" (this is the namespace baked into
+ *      RUNTIME_URL in workfront.js/approval.js/cms-tool.js) → Production workspace
  *   3. Click "Download all" → opens a .json credential file
  *   4. The file contains "runtime" → { "namespace", "auth" }
  *
@@ -24,7 +26,7 @@ const dir = dirname(fileURLToPath(import.meta.url));
 // ── Env checks ────────────────────────────────────────────────────────────────
 const daToken = process.env.DA_TOKEN;
 const runtimeAuth = process.env.AIO_RUNTIME_AUTH;
-const runtimeNamespace = process.env.AIO_RUNTIME_NAMESPACE || '332794-868ceruleanwhale';
+const runtimeNamespace = process.env.AIO_RUNTIME_NAMESPACE || '3635370-144scarletlobster';
 const runtimeApiHost = process.env.AIO_RUNTIME_APIHOST || 'https://adobeioruntime.net';
 
 if (!daToken) {
@@ -34,7 +36,7 @@ if (!daToken) {
 if (!runtimeAuth) {
   console.error('❌  Set AIO_RUNTIME_AUTH env var');
   console.error('   1. Go to https://developer.adobe.com/console');
-  console.error('   2. Open "868CeruleanWhale" project → Production workspace');
+  console.error('   2. Open the project with Runtime namespace "3635370-144scarletlobster" → Production workspace');
   console.error('   3. Click "Download all" → get runtime.auth from the JSON');
   process.exit(1);
 }
@@ -53,7 +55,10 @@ const get = (key) => data.find((r) => r.key === key)?.value;
 
 const clientId = get('clientId');
 const clientSecret = get('clientSecret');
-const domain = get('domain') || 'adoberm.my.workfront.com';
+// Sheet stores either a full "domain" (e.g. foo.my.workfront.com) or a short
+// "tenant" name (e.g. foo) that needs the standard suffix appended.
+const tenant = get('tenant');
+const domain = get('domain') || (tenant && !tenant.includes('.') ? `${tenant}.my.workfront.com` : tenant) || 'adoberm.my.workfront.com';
 
 if (!clientId || !clientSecret) {
   console.error('❌  Missing clientId or clientSecret in .da/adobe-workfront sheet');

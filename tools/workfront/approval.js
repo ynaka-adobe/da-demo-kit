@@ -1,7 +1,7 @@
 const RUNTIME_URL = 'https://3635370-144scarletlobster.adobeioruntime.net/api/v1/web/default/workfront-planning';
+const RUNTIME_ORIGIN = new URL(RUNTIME_URL).origin;
 const WF_DOMAIN = 'aemshowcase2.my.workfront.com';
 const WF_CLIENT_ID = '56e219a0a1eeae8feb55c444e3d8a8b6';
-const REDIRECT_URI = 'https://main--da-demo-kit--ynaka-adobe.aem.live/tools/workfront/approval.html';
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
@@ -45,23 +45,7 @@ async function api(params) {
   return runtimeCall({ ...params, wf_token: token });
 }
 
-// ── OAuth callback handling ───────────────────────────────────────────────────
-
-const urlParams = new URLSearchParams(location.search);
-const oauthCode = urlParams.get('code');
-if (oauthCode) {
-  runtimeCall({ resource: 'exchange_code', code: oauthCode })
-    .then((tokens) => {
-      if (tokens.access_token) {
-        saveTokens(tokens);
-        history.replaceState({}, '', location.pathname);
-      }
-    })
-    .catch(() => {})
-    .finally(() => init());
-} else {
-  init();
-}
+init();
 
 // ── UI helpers ────────────────────────────────────────────────────────────────
 
@@ -178,9 +162,22 @@ function renderConnect() {
   body.innerHTML = `<p>Connect your Workfront account to mark tasks as complete.</p>`;
   const btn = el('button', 'btn-connect', 'Connect Workfront');
   btn.addEventListener('click', () => {
+    // Redirect URI is the Runtime action itself — a fixed, domain-independent
+    // URL registered once with Workfront. It exchanges the code and
+    // postMessages the tokens back to this page's origin (passed via `state`).
     const url = `https://${WF_DOMAIN}/integrations/oauth2/authorize?`
-      + `client_id=${WF_CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
-    window.location.href = url;
+      + `client_id=${WF_CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(RUNTIME_URL)}`
+      + `&state=${encodeURIComponent(location.origin)}`;
+    window.open(url, '_blank', 'width=620,height=720');
+
+    const onMessage = (e) => {
+      if (e.origin === RUNTIME_ORIGIN && e.data?.type === 'wf_tokens') {
+        window.removeEventListener('message', onMessage);
+        saveTokens(e.data);
+        init();
+      }
+    };
+    window.addEventListener('message', onMessage);
   });
   body.append(btn);
   shell.append(header, body);

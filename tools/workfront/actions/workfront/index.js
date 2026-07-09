@@ -1,4 +1,12 @@
-const REDIRECT_URI = 'https://main--parts-cat--ynaka-adobe.aem.live/tools/workfront/workfront.html';
+// This action's own URL — registered with Workfront as the single, permanent
+// OAuth redirect URI. It never changes (shared Runtime namespace), so any
+// site that calls this action gets working Workfront login with zero
+// per-site changes to the Workfront OAuth client's allowlist.
+const RUNTIME_URL = 'https://3635370-144scarletlobster.adobeioruntime.net/api/v1/web/default/workfront-planning';
+
+function esc(s) {
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
 
 async function tokenRequest(domain, body) {
   const resp = await fetch(`https://${domain}/integrations/oauth2/api/v1/token`, {
@@ -7,6 +15,30 @@ async function tokenRequest(domain, body) {
     body: JSON.stringify(body),
   });
   return resp.json();
+}
+
+// Renders the page that lands in the popup after Workfront redirects back here.
+// It hands the tokens to the calling site via postMessage(targetOrigin), where
+// targetOrigin is the caller's own origin, passed through untouched via `state`.
+function relayPage(tokens, state) {
+  const targetOrigin = /^https?:\/\/[a-zA-Z0-9.-]+(?::\d+)?$/.test(state || '') ? state : null;
+  const ok = Boolean(tokens && tokens.access_token);
+  const text = ok
+    ? 'Connected to Workfront — you can close this tab.'
+    : `Workfront authorization failed: ${esc((tokens && (tokens.error_description || tokens.error)) || 'unknown error')}`;
+  return `<!DOCTYPE html><html><body style="font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;padding:0 20px">
+<p>${text}</p>
+<script>
+(function () {
+  var origin = ${JSON.stringify(targetOrigin)};
+  var payload = ${JSON.stringify({ type: 'wf_tokens', ...tokens })};
+  if (origin && window.opener) {
+    try { window.opener.postMessage(payload, origin); } catch (e) {}
+  }
+  setTimeout(function () { window.close(); }, 600);
+}());
+</script>
+</body></html>`;
 }
 
 function wfRequest(method, path, domain, token, body) {
@@ -30,22 +62,26 @@ async function main(params) {
     return { statusCode: 500, body: JSON.stringify({ error: 'Missing WF_CLIENT_ID, WF_CLIENT_SECRET, or WF_DOMAIN' }) };
   }
 
-  const resource = params.resource || 'projects';
-
-  try {
-    if (resource === 'exchange_code') {
-      const code = params.code;
-      if (!code) return { statusCode: 400, body: JSON.stringify({ error: 'Missing code' }) };
+  // OAuth relay landing: Workfront redirects the browser here (not an AJAX
+  // call) after login, with ?code=...&state=<caller origin>.
+  if (params.code) {
+    try {
       const tokens = await tokenRequest(domain, {
         grant_type: 'authorization_code',
         client_id: clientId,
         client_secret: clientSecret,
-        code,
-        redirect_uri: REDIRECT_URI,
+        code: params.code,
+        redirect_uri: RUNTIME_URL,
       });
-      return { statusCode: 200, body: JSON.stringify(tokens) };
+      return { statusCode: 200, headers: { 'Content-Type': 'text/html' }, body: relayPage(tokens, params.state) };
+    } catch (err) {
+      return { statusCode: 200, headers: { 'Content-Type': 'text/html' }, body: relayPage({ error: err.message }, params.state) };
     }
+  }
 
+  const resource = params.resource || 'projects';
+
+  try {
     if (resource === 'refresh_token') {
       const refreshToken = params.refresh_token;
       if (!refreshToken) return { statusCode: 400, body: JSON.stringify({ error: 'Missing refresh_token' }) };
