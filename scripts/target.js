@@ -5,12 +5,6 @@ export function isUePreviewHost(hostname = window.location.hostname) {
   return /\.(?:stage-ue|ue)\.da\.live$/.test(hostname);
 }
 
-/** Homepage only — Target hero/page-load activities are not used on inner pages. */
-export function isHomePage(pathname = window.location.pathname) {
-  const path = pathname.replace(/\/$/, '') || '/';
-  return path === '/' || path === '/index';
-}
-
 /**
  * @param {unknown} e
  * @param {Element} [el]
@@ -21,7 +15,7 @@ function logTargetError(e, el) {
 }
 
 export async function loadTarget() {
-  if (isUePreviewHost() || !isHomePage()) return;
+  if (isUePreviewHost()) return;
   const targetMeta = getMetadata('target');
   if (!targetMeta) return;
 
@@ -64,7 +58,7 @@ export async function loadTarget() {
  * Opt-in via meta target-mbox-hero and optional target-mbox-hero-selector.
  */
 export async function applyTargetHeroMboxIfConfigured() {
-  if (isUePreviewHost() || !isHomePage()) return;
+  if (isUePreviewHost()) return;
   const mbox = getMetadata('target-mbox-hero')?.trim();
   if (!mbox) return;
 
