@@ -4,10 +4,10 @@
  * Usage:
  *   GET /actions/sync-config?targetOrg=my-org&targetRepo=my-site
  *
- * This syncs all config sheets in one call, ready for end users to use.
+ * Uses the admin.da.live config API to fetch and push configuration sheets.
  *
  * Returns:
- *   { success: true, config: {...}, sheets: [...] }
+ *   { success: true, config: {...} }
  */
 
 const CONFIG_API_BASE = 'https://admin.da.live/config';
@@ -29,27 +29,23 @@ async function fetchConfig(org, repo, accessToken) {
   return resp.json();
 }
 
-async function writeSheet(org, repo, sheetName, content, accessToken) {
-  // Determine the file path based on sheet name
-  let filePath = `${sheetName}.json`;
-  if (sheetName.startsWith('.')) {
-    // .da sheets are in .da/ directory
-    filePath = `${sheetName}.json`;
-  }
+async function pushConfig(org, repo, configData, accessToken) {
+  const url = `${CONFIG_API_BASE}/${org}/${repo}/`;
 
-  const url = `https://admin.hlx.page/source/${org}/${repo}/${filePath}`;
+  // Use FormData to send config as form parameter (not JSON body)
+  const formData = new URLSearchParams();
+  formData.append('config', JSON.stringify(configData));
 
   const resp = await fetch(url, {
     method: 'PUT',
     headers: {
       Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
     },
-    body: JSON.stringify(content),
+    body: formData,
   });
 
   if (!resp.ok) {
-    throw new Error(`Failed to write ${sheetName}: ${resp.status} ${resp.statusText}`);
+    throw new Error(`Failed to push config: ${resp.status} ${resp.statusText}`);
   }
 
   return resp.json();
@@ -113,34 +109,19 @@ async function main(params) {
   }
 
   try {
-    // Fetch entire config from source
+    // Fetch config from source via admin.da.live API
     const sourceConfig = await fetchConfig(sourceOrg, sourceRepo, sourceToken);
 
-    const sheetMap = sourceConfig.sheets || {};
-    const syncedSheets = [];
-
-    // Sync each sheet to target
-    for (const [sheetName, sheetData] of Object.entries(sheetMap)) {
-      try {
-        await writeSheet(targetOrg, targetRepo, sheetName, sheetData, targetToken);
-        syncedSheets.push(sheetName);
-      } catch (err) {
-        // Continue with other sheets even if one fails
-        console.warn(`Failed to sync ${sheetName}:`, err.message);
-      }
-    }
+    // Push config to target via admin.da.live API
+    await pushConfig(targetOrg, targetRepo, sourceConfig, targetToken);
 
     return {
       statusCode: 200,
       body: JSON.stringify({
         success: true,
-        message: `Synced ${syncedSheets.length} config sheet(s) from ${sourceOrg}/${sourceRepo} to ${targetOrg}/${targetRepo}`,
+        message: `Synced config from ${sourceOrg}/${sourceRepo} to ${targetOrg}/${targetRepo}`,
         source: { org: sourceOrg, repo: sourceRepo },
         target: { org: targetOrg, repo: targetRepo },
-        sheets: {
-          synced: syncedSheets,
-          total: Object.keys(sheetMap).length,
-        },
         config: sourceConfig,
       }),
       headers: {
@@ -153,7 +134,7 @@ async function main(params) {
       statusCode: 500,
       body: JSON.stringify({
         error: err.message,
-        hint: 'Ensure targetOrg/targetRepo have write access and ADMIN_API_KEY is valid',
+        hint: 'Ensure targetOrg/targetRepo have write access and auth tokens are valid',
       }),
       headers: { 'Content-Type': 'application/json' },
     };
