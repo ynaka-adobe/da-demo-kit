@@ -233,10 +233,34 @@ Trigger sync in your deployment pipeline:
   (read)        (write)
 ```
 
+## Actions
+
+### `/actions/sync-config` — Full config sync
+Sync entire configuration (library, apps, prepare, data sheets) in one call.
+
+**Usage:**
+```bash
+curl "https://your-site.hlx.live/actions/sync-config?targetOrg=my-org&targetRepo=my-site"
+```
+
+**Perfect for:**
+- Creating new demo sites with full default setup
+- End users who want all config in one click
+- Automating demo site provisioning
+
+### `/actions/sync-da-sheet` — Individual sheet sync
+Sync specific sheets or credentials.
+
+**Usage:**
+```bash
+curl "https://your-site.hlx.live/actions/sync-da-sheet?targetOrg=my-org&targetRepo=my-site&sheetPath=.da/adobe-target.json"
+```
+
 ## Files
 
-- `sync-content.html` — Web UI for end users
-- `actions/sync-da-sheet/index.js` — Helix action (REST API)
+- `sync-content.html` — Web UI with both config and sheet sync options
+- `actions/sync-config/index.js` — Full config sync action
+- `actions/sync-da-sheet/index.js` — Individual sheet sync action
 - `SYNC_README.md` — This file
 
 ## Next Steps

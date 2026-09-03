@@ -152,10 +152,20 @@
       </div>
 
       <div class="form-group">
+        <label for="syncMode">What to Sync</label>
+        <select id="syncMode" name="syncMode">
+          <option value="config">Full Config (library, apps, prepare, data)</option>
+          <option value="sheet">Single Sheet...</option>
+        </select>
+        <div class="hint">Sync all default config or specific sheets</div>
+      </div>
+
+      <div class="form-group" id="sheetGroup" style="display: none;">
         <label for="sheetPath">Sheet to Sync</label>
         <select id="sheetPath" name="sheetPath">
           <option value=".da/adobe-target.json">Adobe Target Credentials (.da/adobe-target.json)</option>
           <option value=".da/adobe-workfront.json">Adobe Workfront Config (.da/adobe-workfront.json)</option>
+          <option value="metadata.json">Metadata (metadata.json)</option>
           <option value="custom">Custom Path...</option>
         </select>
         <div class="hint">Select which sheet to copy</div>
@@ -180,9 +190,16 @@
   <script>
     const form = document.getElementById('syncForm');
     const statusDiv = document.getElementById('status');
+    const syncModeSelect = document.getElementById('syncMode');
+    const sheetGroup = document.getElementById('sheetGroup');
     const sheetPathSelect = document.getElementById('sheetPath');
     const customPathGroup = document.getElementById('customPathGroup');
     const syncBtn = document.getElementById('syncBtn');
+
+    // Toggle sheet selection based on sync mode
+    syncModeSelect.addEventListener('change', () => {
+      sheetGroup.style.display = syncModeSelect.value === 'sheet' ? 'block' : 'none';
+    });
 
     // Toggle custom path input
     sheetPathSelect.addEventListener('change', () => {
@@ -194,30 +211,62 @@
 
       const targetOrg = document.getElementById('targetOrg').value.trim();
       const targetRepo = document.getElementById('targetRepo').value.trim();
-      let sheetPath = sheetPathSelect.value;
-
-      if (sheetPath === 'custom') {
-        sheetPath = document.getElementById('customPath').value.trim();
-        if (!sheetPath) {
-          showStatus('Please enter a custom sheet path', 'error');
-          return;
-        }
-      }
+      const syncMode = syncModeSelect.value;
 
       if (!targetOrg || !targetRepo) {
         showStatus('Please fill in all fields', 'error');
         return;
       }
 
-      await syncSheet(targetOrg, targetRepo, sheetPath);
+      if (syncMode === 'config') {
+        await syncConfig(targetOrg, targetRepo);
+      } else {
+        let sheetPath = sheetPathSelect.value;
+
+        if (sheetPath === 'custom') {
+          sheetPath = document.getElementById('customPath').value.trim();
+          if (!sheetPath) {
+            showStatus('Please enter a custom sheet path', 'error');
+            return;
+          }
+        }
+
+        await syncSheet(targetOrg, targetRepo, sheetPath);
+      }
     });
+
+    async function syncConfig(org, repo) {
+      syncBtn.disabled = true;
+      showStatus('Syncing full config (library, apps, prepare, data)...', 'loading');
+
+      try {
+        const actionUrl = `/actions/sync-config?targetOrg=${encodeURIComponent(org)}&targetRepo=${encodeURIComponent(repo)}`;
+
+        const resp = await fetch(actionUrl, {
+          method: 'GET',
+          headers: { Accept: 'application/json' },
+        });
+
+        const data = await resp.json();
+
+        if (!resp.ok) {
+          throw new Error(data.error || `HTTP ${resp.status}`);
+        }
+
+        showStatus(`✓ Config synced! ${data.sheets.synced.length} sheet(s) to ${org}/${repo}`, 'success');
+        form.reset();
+      } catch (err) {
+        showStatus(`✗ Error: ${err.message}`, 'error');
+      } finally {
+        syncBtn.disabled = false;
+      }
+    }
 
     async function syncSheet(org, repo, path) {
       syncBtn.disabled = true;
-      showStatus('Syncing content...', 'loading');
+      showStatus('Syncing sheet...', 'loading');
 
       try {
-        // Build the action URL - assumes this page is on the same site
         const actionUrl = `/actions/sync-da-sheet?targetOrg=${encodeURIComponent(org)}&targetRepo=${encodeURIComponent(repo)}&sheetPath=${encodeURIComponent(path)}`;
 
         const resp = await fetch(actionUrl, {
