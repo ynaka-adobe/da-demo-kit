@@ -4,12 +4,13 @@
   "editUrlPattern": "https://da.live/edit#/{{org}}/{{site}}{{pathname}}",
   "plugins": [
     {
-      "id": "generate-variations",
-      "title": "Generate Variations",
-      "url": "https://experience.adobe.com/aem/generate-variations",
-      "passConfig": true,
-      "environments": ["preview", "live", "edit"],
-      "includePaths": ["**"]
+      "id": "aem-genai-variations",
+      "titleI18n": {
+        "en": "Generate with AI"
+      },
+      "environments": ["preview"],
+      "includePaths": ["**.docx**"],
+      "event": "aem-genai-variations-sidekick"
     },
     {
       "id": "target",
