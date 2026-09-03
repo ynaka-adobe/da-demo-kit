@@ -13,15 +13,15 @@
 :root {
   /* colors */
   --background-color: white;
-  --light-color: #f4f7f9;
-  --dark-color: #0b2545;
-  --text-color: #131313;
-  --link-color: #0f7a8c;
-  --link-hover-color: #0b5c6a;
+  --light-color: #f4f4f5;
+  --dark-color: #121416;
+  --text-color: #1f2327;
+  --link-color: #8b71fe;
+  --link-hover-color: #6e51fd;
 
   /* fonts */
-  --body-font-family: roboto, roboto-fallback, sans-serif;
-  --heading-font-family: roboto-condensed, roboto-condensed-fallback, sans-serif;
+  --body-font-family: poppins, roboto-fallback, sans-serif;
+  --heading-font-family: montserrat, roboto-condensed-fallback, sans-serif;
 
   /* body sizes */
   --body-font-size-m: 22px;
@@ -120,7 +120,12 @@ h6 {
   scroll-margin: 40px;
 }
 
-h1 { font-size: var(--heading-font-size-xxl); }
+h1 {
+  font-size: var(--heading-font-size-xxl);
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+}
 h2 { font-size: var(--heading-font-size-xl); }
 h3 { font-size: var(--heading-font-size-l); }
 h4 { font-size: var(--heading-font-size-m); }
@@ -261,6 +266,17 @@ main .section.highlight {
   background-color: var(--light-color);
   margin: 0;
   padding: 40px 0;
+}
+
+main .section.glow {
+  background:
+    radial-gradient(
+      ellipse 50% 60% at 25% 40%,
+      var(--light-color) 0%,
+      var(--background-color) 70%
+    );
+  margin: 0;
+  padding: 64px 0;
 }
 
 main .section.dark {
