@@ -14,6 +14,17 @@ async function fetchActivities() {
   return activities ?? [];
 }
 
+async function fetchActivityDetails(activityId, activityType) {
+  try {
+    const response = await runtimeFetch({ resource: 'activity', id: activityId, type: activityType, version: 'v3' });
+    console.log('Raw activity details response:', response);
+    return response ?? {};
+  } catch (err) {
+    console.error('Activity details fetch failed:', err);
+    return {};
+  }
+}
+
 async function fetchOffers() {
   const { offers } = await runtimeFetch({ resource: 'offers' });
   return offers ?? [];
@@ -330,14 +341,81 @@ function renderActionBar(onActivityCreated) {
     }
   });
 
-  wrapper.append(btn, flyout, changeBtn);
+  const insertBtn = document.createElement('button');
+  insertBtn.className = 'btn-change hidden';
+  insertBtn.textContent = 'Insert into Page';
+  insertBtn.addEventListener('click', async () => {
+    const activity = insertBtn._activity;
+    console.log('Insert button clicked, activity:', activity);
+    if (!activity) {
+      console.log('No activity selected');
+      return;
+    }
+
+    insertBtn.disabled = true;
+    insertBtn.textContent = 'Inserting…';
+
+    try {
+      console.log('Fetching DA context...');
+      const daContext = await Promise.race([
+        DA_SDK,
+        new Promise((resolve) => setTimeout(() => resolve(null), 1500)),
+      ]);
+
+      if (!daContext?.actions?.sendHTML) {
+        throw new Error('DA context not available');
+      }
+
+      console.log('Fetching activity details for ID:', activity.id, activity.type);
+      // Fetch full activity details to get the location/mbox
+      const activityDetails = await fetchActivityDetails(activity.id, activity.type);
+      console.log('Activity details:', activityDetails);
+
+      const mboxName = activityDetails.locations?.mboxes?.[0]?.name || 'target-global-mbox';
+      console.log('Using mbox name:', mboxName);
+
+      // Build empty target-offer block with one empty row
+      const offerBlockHtml = `<table><tbody>`
+        + `<tr><td>target-offer</td></tr>`
+        + `<tr><td></td></tr>`
+        + `</tbody></table>`;
+
+      // Build metadata block with activity configuration
+      const metadataBlockHtml = `<table><tbody>`
+        + `<tr><td colspan="2">metadata</td></tr>`
+        + `<tr><td>Experience</td><td>${activity.name}</td></tr>`
+        + `<tr><td>target</td><td>on</td></tr>`
+        + `<tr><td>target-mbox-hero</td><td>${mboxName}</td></tr>`
+        + `<tr><td>target-mbox-hero-selector</td><td>.target-offer</td></tr>`
+        + `<tr><td>activity</td><td>${activity.id}</td></tr>`
+        + `</tbody></table>`;
+
+      // Send both blocks to be inserted into the page
+      daContext.actions.sendHTML(offerBlockHtml + metadataBlockHtml);
+
+      insertBtn.textContent = 'Inserted!';
+      setTimeout(() => {
+        insertBtn.disabled = false;
+        insertBtn.textContent = 'Insert into Page';
+      }, 1500);
+    } catch (err) {
+      console.error('Insert error:', err);
+      alert(`Failed to insert block: ${err.message}`);
+      insertBtn.disabled = false;
+      insertBtn.textContent = 'Insert into Page';
+    }
+  });
+
+  wrapper.append(btn, flyout, changeBtn, insertBtn);
 
   wrapper.setSelected = (hasSelection, activity = null) => {
     btn.disabled = hasSelection;
     btn.classList.toggle('disabled', hasSelection);
     flyout.classList.add('hidden');
     changeBtn.classList.toggle('hidden', !hasSelection);
+    insertBtn.classList.toggle('hidden', !hasSelection);
     changeBtn._activity = activity;
+    insertBtn._activity = activity;
   };
 
   return wrapper;
