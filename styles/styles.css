@@ -13,11 +13,11 @@
 :root {
   /* colors */
   --background-color: white;
-  --light-color: #f8f8f8;
-  --dark-color: #505050;
+  --light-color: #f4f7f9;
+  --dark-color: #0b2545;
   --text-color: #131313;
-  --link-color: #3b63fb;
-  --link-hover-color: #1d3ecf;
+  --link-color: #0f7a8c;
+  --link-hover-color: #0b5c6a;
 
   /* fonts */
   --body-font-family: roboto, roboto-fallback, sans-serif;
@@ -261,4 +261,15 @@ main .section.highlight {
   background-color: var(--light-color);
   margin: 0;
   padding: 40px 0;
+}
+
+main .section.dark {
+  background-color: var(--dark-color);
+  color: var(--background-color);
+  margin: 0;
+  padding: 40px 0;
+}
+
+main .section.dark a:any-link {
+  color: var(--background-color);
 }
