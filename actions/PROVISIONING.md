@@ -1,50 +1,87 @@
-# Cross-org sync provisioning
+# Sync provisioning — credentials for cross-org sync
 
-`sync-config` and `sync-da-sheet` write configuration/content from `ynaka-adobe/da-demo-kit`
-into a **target** org/site. When the target is a **different org**, the write needs a credential
-with admin/write access to *that* org. The actions look it up as an env var:
+The sync actions touch **two different auth realms**, and one credential does **not** cover both (verified: a
+`admin.hlx.page` key returns **401** on `admin.da.live`):
 
+| What you sync | Endpoint / host | Auth |
+|---|---|---|
+| Content, `.da/*.json`, `docs/library` | DA **content sources** (`content.da.live`) | the DA connector / the user's own DA session — no key needed |
+| **Config sheets** (data, library, apps, prepare) | **`admin.da.live/config`** (config store, `PUT`) | an **IMS Bearer token** — see below |
+
+`admin.da.live` has **no durable API-key system** (no `/login`, no `apiKeys` endpoint, no `WWW-Authenticate`
+challenge — it only accepts an IMS Bearer token). The da.live *session* token works but expires and can't be
+scripted. So the **durable** credential for config writes is an **IMS OAuth Server-to-Server (S2S) technical
+account**.
+
+---
+
+## Durable DA credential: IMS Server-to-Server
+
+### 1. Create the S2S credential (once)
+
+1. Go to the **Adobe Developer Console** → **Create new project**.
+2. **Add API / credential** → **OAuth Server-to-Server**.
+3. Save the credential's **Client ID**, **Client Secret**, **Technical Account email**, and the granted **Scopes**.
+
+> ⚠️ Verify at setup: confirm the scopes/product profile actually authorize `admin.da.live`. DA is newer and may
+> not appear as a first-class Console API — if a dedicated DA scope isn't offered, the token is still a valid IMS
+> identity token, and DA authorizes it via the **permissions grant in step 2** (DA's model is identity-based, not
+> scope-based). Test with the read in step 4 before relying on it.
+
+### 2. Grant that identity `write` on the target org's config (per target org)
+
+DA authorizes by **identity + path** in each org's **`permissions`** config sheet. The target org's owner opens
+their org config in `da.live/config`, opens the **`permissions`** sheet, and adds two rows granting the credential's
+identity `write`:
+
+| path | groups | actions | comments |
+|---|---|---|---|
+| `CONFIG` | `<technical-account-email>` | `write` | The ability to set configurations for an org. |
+| `/ + **` | `<technical-account-email>` | `write` | The ability to create content. |
+
+Use the **Technical Account email** from step 1 as `groups` (for the attended/you-run case, use `ynaka@adobe.com`
+instead — see the screenshot below, which shows exactly this granted to a real identity). Click **Save**.
+
+**What a correct `permissions` sheet looks like:**
+
+![DA config permissions — CONFIG + content write](assets/da-config-permissions.png)
+
+> This is the whole "add an admin" step for DA — it's a row in the org's `permissions` sheet, not a separate UI.
+
+### 3. Mint an IMS token from the S2S credential (headless, repeatable)
+
+```bash
+curl -sf -X POST https://ims-na1.adobelogin.com/ims/token/v3 \
+  -d grant_type=client_credentials \
+  -d "client_id=$IMS_CLIENT_ID" \
+  -d "client_secret=$IMS_CLIENT_SECRET" \
+  -d "scope=$IMS_SCOPES" | jq -r .access_token
 ```
-TOKEN_<ORG uppercased, hyphens -> underscores>   # e.g. org "ynakagawa" -> TOKEN_YNAKAGAWA
+(`$IMS_CLIENT_ID` / `$IMS_CLIENT_SECRET` / `$IMS_SCOPES` come from step 1 — keep them as env/secrets, never in
+chat.) This returns a short-lived Bearer you fetch fresh whenever you need it — durable because the *credential* is
+stored, not the token.
+
+### 4. Use the token for the config PUT (and verify)
+
+```bash
+TOKEN=$(… step 3 …)
+# verify auth first (should be 200 now that step 2 granted CONFIG write):
+curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $TOKEN" \
+  https://admin.da.live/config/<org>/<site>/
+# then write:
+curl -sf -X PUT "https://admin.da.live/config/<org>/<site>/" \
+  -H "Authorization: Bearer $TOKEN" \
+  --data-urlencode "config@config.json"
 ```
 
-If it isn't set, the actions fall back to da-demo-kit's own `ADMIN_API_KEY`, which **cannot**
-write another org — so cross-org sync fails with a 401/403 on the push. That's the bug.
+The sync actions already accept a token (`accessToken` param / `ADMIN_API_KEY`) — feed the minted token there, or
+store the S2S client id/secret on the runtime and have the action mint the token itself.
 
-## One-time setup per target org
+---
 
-1. **Get admin on the target org.** Have the site owner add `ynaka@adobe.com` as an **admin**
-   in the AEM Code Sync bot wizard's **Users** step (org-level covers all their sites). Only an
-   admin can mint keys.
+## Summary of who holds what
 
-2. **Mint an org-level key** with `actions/provision-org-key.sh` (auth with your admin token in
-   the environment — never in chat or on the command line):
-
-   ```sh
-   ADMIN_TOKEN=<your-admin-token> ./actions/provision-org-key.sh <target-org> admin
-   # if you bootstrap with an existing API key instead of an IMS token:
-   AUTH_HEADER="X-Auth-Token:" ADMIN_TOKEN=<api-key> ./actions/provision-org-key.sh <target-org> config,publish
-   ```
-
-   It calls `POST https://admin.hlx.page/config/<org>/apiKeys.json` and returns the key **once**.
-
-3. **Store the key** on the da-demo-kit runtime (Adobe I/O Runtime / App Builder) as the env var
-   the actions expect, e.g. `TOKEN_YNAKAGAWA=<key>`. No action code change is needed — the lookup
-   is already there.
-
-After that, `sync-config` / `sync-da-sheet` for that org authenticate with the stored key and the
-cross-org write succeeds.
-
-## Open item to verify (host split)
-
-API keys are minted on **`admin.hlx.page`**. `sync-da-sheet` also uses `admin.hlx.page`, so the same
-key should work there. `sync-config` writes to **`admin.da.live`** (a different host). Confirm with a
-live test whether the `admin.hlx.page` key authorizes an `admin.da.live` config write. If it does not,
-the config sync needs a **DA-scoped** token for the target org instead (same admin membership, DA's
-own key/session) — mint/store that separately and have `sync-config` read it.
-
-## Keys are per creation-level
-
-Keys can be created org-, profile-, or site-level (`/config/<org>[/sites/<site>]/apiKeys.json`) and are
-scoped to that level. Org-level is preferred (one key per teammate org). List with `GET …/apiKeys.json`
-(metadata only — the secret is not returned again); delete with `DELETE …/apiKeys/<id>.json`.
+- **Content / sheets / library** → DA connector (the user's own session) → no credential to manage.
+- **Config store** → IMS S2S technical account → its identity is granted `write` in each target org's `permissions`
+  sheet (step 2) → the action/script mints a token (step 3) and PUTs config (step 4).
+- The `admin.hlx.page` Site Admin key is still useful for **helix** ops (publish, source) but **not** for DA config.
