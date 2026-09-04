@@ -8,12 +8,15 @@
  * valid as long as its identity is granted access in both orgs' `permissions` sheets
  * (read on da-demo-kit, write on the target). See actions/PROVISIONING.md.
  *   1. ?accessToken=...                      (explicit override, for testing)
- *   2. DA_TOKEN runtime secret               (a long-lived DA admin token)  <- primary
- *   3. IMS Server-to-Server minted token     (IMS_CLIENT_ID/SECRET/SCOPES)  <- fallback
+ *   2. IMS Server-to-Server minted token     (IMS_CLIENT_ID/SECRET/SCOPES)  <- primary
+ *
+ * The action stores only the S2S client_id/secret/scopes as runtime secrets and exchanges
+ * them for a fresh IMS Bearer per call (grant_type=client_credentials) — nothing long-lived
+ * to store or rotate. The minted token's technical-account identity is what the target org's
+ * `permissions` sheet must grant `write` (its two IMS org IDs). See actions/PROVISIONING.md.
  *
  * Env:
- *   DA_TOKEN                                   (long-lived DA admin token — primary path)
- *   IMS_CLIENT_ID, IMS_CLIENT_SECRET, IMS_SCOPES  (S2S fallback)
+ *   IMS_CLIENT_ID, IMS_CLIENT_SECRET, IMS_SCOPES  (S2S technical account)
  *
  * Returns:
  *   { success: true, config: {...} }
@@ -21,19 +24,6 @@
 
 const CONFIG_API_BASE = 'https://admin.da.live/config';
 const IMS_TOKEN_URL = 'https://ims-na1.adobelogin.com/ims/token/v3';
-
-/**
- * The long-lived DA_Token, provided directly as a runtime secret (process.env.DA_TOKEN).
- *
- * We deliberately do NOT read it from da-demo-kit's `.da/adobe-da` DA sheet: that sheet is
- * DA content on admin.da.live, which itself requires a DA credential to read — i.e. the very
- * token we'd be bootstrapping (circular) — and it is not served on admin.hlx.page (404). So
- * DA_Token must be supplied as a runtime secret (`aio app deploy` picks it up from .env /
- * app config, or set it with `aio runtime action update`). Returns null if unset.
- */
-function getDaToken() {
-  return process.env.DA_TOKEN || null;
-}
 
 /**
  * Mint an IMS access token via the client_credentials (Server-to-Server) grant.
@@ -142,22 +132,17 @@ async function main(params) {
   // read and the target write, given its identity is granted access in both orgs'
   // `permissions` sheets (read on da-demo-kit, write on the target).
   //   1. ?accessToken=  (explicit override, for testing)
-  //   2. DA_TOKEN runtime secret (a long-lived DA admin token)
-  //   3. IMS Server-to-Server minted token (IMS_CLIENT_ID/SECRET/SCOPES)
+  //   2. IMS Server-to-Server minted token (IMS_CLIENT_ID/SECRET/SCOPES)
   let token = params.accessToken;
   let authError = null;
 
   if (!token) {
-    token = getDaToken(); // DA_TOKEN runtime secret (primary)
-    if (!token) authError = 'DA_TOKEN not set';
-  }
-
-  if (!token) {
     try {
-      token = await getImsToken(); // S2S fallback
+      token = await getImsToken(); // exchange S2S client_credentials for an IMS Bearer (primary)
     } catch (err) {
       authError = `IMS S2S: ${err.message}`;
     }
+    if (!token && !authError) authError = 'IMS_CLIENT_ID / IMS_CLIENT_SECRET not set';
   }
 
   if (!token) {
@@ -167,9 +152,8 @@ async function main(params) {
         error: 'Missing authentication',
         detail: authError,
         solutions: [
-          'Primary: set the DA_TOKEN runtime secret to a long-lived DA admin token',
-          'Fallback: set IMS_CLIENT_ID / IMS_CLIENT_SECRET (and IMS_SCOPES) for the S2S technical account',
-          'Grant the identity write on CONFIG in the target org\'s `permissions` sheet (see PROVISIONING.md)',
+          'Set IMS_CLIENT_ID / IMS_CLIENT_SECRET (and IMS_SCOPES) so the action can mint an IMS token',
+          'Grant that technical account write on CONFIG in the target org\'s `permissions` sheet (see PROVISIONING.md)',
           'Or pass ?accessToken=YOUR_TOKEN to override for testing',
         ],
       }),
