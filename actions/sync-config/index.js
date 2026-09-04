@@ -8,12 +8,15 @@
  * valid as long as its identity is granted access in both orgs' `permissions` sheets
  * (read on da-demo-kit, write on the target). See actions/PROVISIONING.md.
  *   1. ?accessToken=...                      (explicit override, for testing)
- *   2. DA_Token from da-demo-kit `.da/adobe-da`  (read with the helix ADMIN_API_KEY)  <- primary
- *   3. IMS Server-to-Server minted token     (IMS_CLIENT_ID/SECRET/SCOPES)            <- fallback
+ *   2. IMS Server-to-Server minted token     (IMS_CLIENT_ID/SECRET/SCOPES)  <- primary
+ *
+ * The action stores only the S2S client_id/secret/scopes as runtime secrets and exchanges
+ * them for a fresh IMS Bearer per call (grant_type=client_credentials) — nothing long-lived
+ * to store or rotate. The minted token's technical-account identity is what the target org's
+ * `permissions` sheet must grant `write` (its two IMS org IDs). See actions/PROVISIONING.md.
  *
  * Env:
- *   ADMIN_API_KEY                              (to read the DA_Token sheet — primary path)
- *   IMS_CLIENT_ID, IMS_CLIENT_SECRET, IMS_SCOPES  (S2S fallback)
+ *   IMS_CLIENT_ID, IMS_CLIENT_SECRET, IMS_SCOPES  (S2S technical account)
  *
  * Returns:
  *   { success: true, config: {...} }
@@ -159,8 +162,7 @@ async function main(params) {
   // read and the target write, given its identity is granted access in both orgs'
   // `permissions` sheets (read on da-demo-kit, write on the target).
   //   1. ?accessToken=  (explicit override, for testing)
-  //   2. DA_Token from da-demo-kit's `.da/adobe-da` sheet (read with the helix ADMIN_API_KEY)
-  //   3. IMS Server-to-Server minted token (IMS_CLIENT_ID/SECRET/SCOPES)
+  //   2. IMS Server-to-Server minted token (IMS_CLIENT_ID/SECRET/SCOPES)
   let token = params.accessToken;
   let authError = null;
 
@@ -178,6 +180,7 @@ async function main(params) {
     } catch (err) {
       authError = `IMS S2S: ${err.message}`;
     }
+    if (!token && !authError) authError = 'IMS_CLIENT_ID / IMS_CLIENT_SECRET not set';
   }
 
   if (!token) {
@@ -187,9 +190,8 @@ async function main(params) {
         error: 'Missing authentication',
         detail: authError,
         solutions: [
-          'Primary: set ADMIN_API_KEY so the action can read DA_Token from da-demo-kit `.da/adobe-da`',
-          'Fallback: set IMS_CLIENT_ID / IMS_CLIENT_SECRET (and IMS_SCOPES) for the S2S technical account',
-          'Grant the identity write on CONFIG in the target org\'s `permissions` sheet (see PROVISIONING.md)',
+          'Set IMS_CLIENT_ID / IMS_CLIENT_SECRET (and IMS_SCOPES) so the action can mint an IMS token',
+          'Grant that technical account write on CONFIG in the target org\'s `permissions` sheet (see PROVISIONING.md)',
           'Or pass ?accessToken=YOUR_TOKEN to override for testing',
         ],
       }),
