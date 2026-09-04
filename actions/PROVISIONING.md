@@ -28,25 +28,29 @@ account**.
 > identity token, and DA authorizes it via the **permissions grant in step 2** (DA's model is identity-based, not
 > scope-based). Test with the read in step 4 before relying on it.
 
-### 2. Grant that identity `write` on the target org's config (per target org)
+### 2. Grant `write` in the target org's `permissions` sheet (per target org)
 
 DA authorizes by **identity + path** in each org's **`permissions`** config sheet. The target org's owner opens
-their org config in `da.live/config`, opens the **`permissions`** sheet, and adds two rows granting the credential's
-identity `write`:
+their org config in `da.live/config`, opens the **`permissions`** sheet, and adds **four rows** — granting `write`
+on both `CONFIG` and content (`/ + **`) to **both IMS orgs** the sync identity resolves through:
 
 | path | groups | actions | comments |
 |---|---|---|---|
-| `CONFIG` | `<technical-account-email>` | `write` | The ability to set configurations for an org. |
-| `/ + **` | `<technical-account-email>` | `write` | The ability to create content. |
+| `CONFIG` | `21BD487E5F2280130A495ECC` | `write` | ACS Customer Solutions Services Marketing (Yuji) |
+| `/ + **` | `21BD487E5F2280130A495ECC` | `write` | ACS Customer Solutions Services Marketing (Yuji) |
+| `CONFIG` | `EE9332B3547CC74E0A4C98A1` | `write` | Adobe Inc. |
+| `/ + **` | `EE9332B3547CC74E0A4C98A1` | `write` | Adobe Inc. |
 
-Use the **Technical Account email** from step 1 as `groups` (for the attended/you-run case, use `ynaka@adobe.com`
-instead — see the screenshot below, which shows exactly this granted to a real identity). Click **Save**.
+**Both IMS orgs are required** — `21BD487E5F2280130A495ECC` (ACS Customer Solutions Services Marketing, where the
+sync identity lives) **and** `EE9332B3547CC74E0A4C98A1` (Adobe Inc.). Granting only one is not enough. Click
+**Save**. This exact grant is what took the live test from **403 → 201** on the config `PUT`.
 
 **What a correct `permissions` sheet looks like:**
 
-![DA config permissions — CONFIG + content write](assets/da-config-permissions.png)
+![DA config permissions — CONFIG + content write for both IMS orgs](assets/da-config-permissions.png)
 
-> This is the whole "add an admin" step for DA — it's a row in the org's `permissions` sheet, not a separate UI.
+> This is the whole "add an admin" step for DA — rows in the org's `permissions` sheet, not a separate UI. `groups`
+> holds **IMS org IDs** (grant everyone in that org), not individual emails.
 
 ### 3. Mint an IMS token from the S2S credential (headless, repeatable)
 
