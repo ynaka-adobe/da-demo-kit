@@ -19,6 +19,16 @@
       "passConfig": true,
       "environments": ["preview", "live", "edit"],
       "includePaths": ["**"]
+    },
+    {
+      "id": "persona",
+      "title": "Persona",
+      "url": "/tools/persona/persona.html",
+      "isPalette": true,
+      "passReferrer": true,
+      "paletteRect": "top: 40px; right: 0; width: 400px; height: calc(100% - 40px);",
+      "environments": ["preview", "live", "edit", "prod"],
+      "includePaths": ["**"]
     }
   ]
 }
