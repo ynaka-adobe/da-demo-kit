@@ -8,3 +8,10 @@ helix-importer-ui
 *.bak
 .idea
 tools/target/config.json
+
+# App Builder / secrets — never commit
+.env
+.env.*
+.aio
+dist/
+.claude/

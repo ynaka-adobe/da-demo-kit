@@ -30,8 +30,8 @@ const DA_TOKEN_SHEET = '.da/adobe-da.json';
  * (which works on admin.hlx.page); the DA_Token it holds is then used as the
  * Bearer for the admin.da.live config calls. Returns null if ADMIN_API_KEY isn't set.
  */
-async function getDaToken(org, repo) {
-  const key = process.env.ADMIN_API_KEY;
+async function getDaToken(org, repo, params) {
+  const key = params.ADMIN_API_KEY || process.env.ADMIN_API_KEY;
   if (!key) return null;
 
   const url = `${SOURCE_API_BASE}/${org}/${repo}/${DA_TOKEN_SHEET}`;
@@ -56,10 +56,10 @@ async function getDaToken(org, repo) {
  * Mint an IMS access token via the client_credentials (Server-to-Server) grant.
  * Returns null if S2S credentials aren't configured.
  */
-async function getImsToken() {
-  const clientId = process.env.IMS_CLIENT_ID;
-  const clientSecret = process.env.IMS_CLIENT_SECRET;
-  const scope = process.env.IMS_SCOPES;
+async function getImsToken(params) {
+  const clientId = params.IMS_CLIENT_ID || process.env.IMS_CLIENT_ID;
+  const clientSecret = params.IMS_CLIENT_SECRET || process.env.IMS_CLIENT_SECRET;
+  const scope = params.IMS_SCOPES || process.env.IMS_SCOPES;
 
   if (!clientId || !clientSecret) return null;
 
@@ -166,7 +166,7 @@ async function main(params) {
 
   if (!token) {
     try {
-      token = await getDaToken(sourceOrg, sourceRepo); // DA_Token from the sheet (primary)
+      token = await getDaToken(sourceOrg, sourceRepo, params); // DA_Token from the sheet (primary)
     } catch (err) {
       authError = `DA_Token: ${err.message}`;
     }
@@ -174,7 +174,7 @@ async function main(params) {
 
   if (!token) {
     try {
-      token = await getImsToken(); // S2S fallback
+      token = await getImsToken(params); // S2S fallback
     } catch (err) {
       authError = `IMS S2S: ${err.message}`;
     }
