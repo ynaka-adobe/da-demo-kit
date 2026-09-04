@@ -4,16 +4,16 @@
  * Usage:
  *   GET /actions/sync-config?targetOrg=my-org&targetRepo=my-site
  *
- * Auth: mints its own IMS Server-to-Server (client_credentials) token from stored
- * credentials, and uses it for BOTH the source read and the target write. One token
- * works for both as long as the S2S technical-account identity is granted access in
- * each org's `permissions` config sheet (read on da-demo-kit, write on the target).
- * See actions/PROVISIONING.md.
+ * Auth (primary -> fallback), same token used for BOTH source read and target write —
+ * valid as long as its identity is granted access in both orgs' `permissions` sheets
+ * (read on da-demo-kit, write on the target). See actions/PROVISIONING.md.
+ *   1. ?accessToken=...                      (explicit override, for testing)
+ *   2. DA_Token from da-demo-kit `.da/adobe-da`  (read with the helix ADMIN_API_KEY)  <- primary
+ *   3. IMS Server-to-Server minted token     (IMS_CLIENT_ID/SECRET/SCOPES)            <- fallback
  *
- * Required env (S2S technical account):
- *   IMS_CLIENT_ID, IMS_CLIENT_SECRET, IMS_SCOPES
- * Optional override for testing/attended runs:
- *   ?accessToken=... (skips minting)
+ * Env:
+ *   ADMIN_API_KEY                              (to read the DA_Token sheet — primary path)
+ *   IMS_CLIENT_ID, IMS_CLIENT_SECRET, IMS_SCOPES  (S2S fallback)
  *
  * Returns:
  *   { success: true, config: {...} }
@@ -21,6 +21,36 @@
 
 const CONFIG_API_BASE = 'https://admin.da.live/config';
 const IMS_TOKEN_URL = 'https://ims-na1.adobelogin.com/ims/token/v3';
+const SOURCE_API_BASE = 'https://admin.hlx.page/source';
+const DA_TOKEN_SHEET = '.da/adobe-da.json';
+
+/**
+ * Read the long-lived DA_Token from da-demo-kit's `.da/adobe-da` sheet.
+ * The sheet is fetched from the helix source host with the helix ADMIN_API_KEY
+ * (which works on admin.hlx.page); the DA_Token it holds is then used as the
+ * Bearer for the admin.da.live config calls. Returns null if ADMIN_API_KEY isn't set.
+ */
+async function getDaToken(org, repo) {
+  const key = process.env.ADMIN_API_KEY;
+  if (!key) return null;
+
+  const url = `${SOURCE_API_BASE}/${org}/${repo}/${DA_TOKEN_SHEET}`;
+  const resp = await fetch(url, {
+    headers: { 'X-Auth-Token': key, Accept: 'application/json' },
+  });
+
+  if (!resp.ok) {
+    throw new Error(`Failed to read DA_Token sheet (${DA_TOKEN_SHEET}): ${resp.status} ${resp.statusText}`);
+  }
+
+  const sheet = await resp.json();
+  const rows = Array.isArray(sheet.data) ? sheet.data : [];
+  const row = rows.find((r) => r.key === 'DA_Token');
+  if (!row || !row.value) {
+    throw new Error('DA_Token row not found in .da/adobe-da sheet');
+  }
+  return row.value;
+}
 
 /**
  * Mint an IMS access token via the client_credentials (Server-to-Server) grant.
@@ -125,23 +155,28 @@ async function main(params) {
     };
   }
 
-  // Auth: caller-supplied token wins (testing/attended); otherwise mint an IMS
-  // Server-to-Server token from stored credentials. The same token authorizes the
-  // source read and the target write (given the S2S identity is granted access in
-  // both orgs' `permissions` sheets).
+  // Auth resolution (primary -> fallback). The same token authorizes both the source
+  // read and the target write, given its identity is granted access in both orgs'
+  // `permissions` sheets (read on da-demo-kit, write on the target).
+  //   1. ?accessToken=  (explicit override, for testing)
+  //   2. DA_Token from da-demo-kit's `.da/adobe-da` sheet (read with the helix ADMIN_API_KEY)
+  //   3. IMS Server-to-Server minted token (IMS_CLIENT_ID/SECRET/SCOPES)
   let token = params.accessToken;
+  let authError = null;
+
   if (!token) {
     try {
-      token = await getImsToken();
+      token = await getDaToken(sourceOrg, sourceRepo); // DA_Token from the sheet (primary)
     } catch (err) {
-      return {
-        statusCode: 502,
-        body: JSON.stringify({
-          error: `Could not mint IMS token: ${err.message}`,
-          hint: 'Check IMS_CLIENT_ID / IMS_CLIENT_SECRET / IMS_SCOPES for the S2S technical account.',
-        }),
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-      };
+      authError = `DA_Token: ${err.message}`;
+    }
+  }
+
+  if (!token) {
+    try {
+      token = await getImsToken(); // S2S fallback
+    } catch (err) {
+      authError = `IMS S2S: ${err.message}`;
     }
   }
 
@@ -150,9 +185,11 @@ async function main(params) {
       statusCode: 401,
       body: JSON.stringify({
         error: 'Missing authentication',
+        detail: authError,
         solutions: [
-          'Set IMS_CLIENT_ID / IMS_CLIENT_SECRET (and IMS_SCOPES) for the S2S technical account',
-          'Grant that identity write on CONFIG in the target org\'s `permissions` sheet (see PROVISIONING.md)',
+          'Primary: set ADMIN_API_KEY so the action can read DA_Token from da-demo-kit `.da/adobe-da`',
+          'Fallback: set IMS_CLIENT_ID / IMS_CLIENT_SECRET (and IMS_SCOPES) for the S2S technical account',
+          'Grant the identity write on CONFIG in the target org\'s `permissions` sheet (see PROVISIONING.md)',
           'Or pass ?accessToken=YOUR_TOKEN to override for testing',
         ],
       }),
