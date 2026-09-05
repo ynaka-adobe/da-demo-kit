@@ -1,3 +1,15 @@
+/* Full-bleed: break out of the section's max-width container */
+.carousel-wrapper {
+  max-width: 100% !important;
+  padding: 0 !important;
+  margin: 0;
+}
+
+/* Remove the section's top padding when the carousel leads the section */
+main .section:has(> .carousel-wrapper:first-child) {
+  padding-top: 0;
+}
+
 .carousel .carousel-slides-container {
   position: relative;
 }
