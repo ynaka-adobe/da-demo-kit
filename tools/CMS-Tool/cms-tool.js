@@ -43,6 +43,20 @@ async function fetchTargetActivities() {
   return json.activities ?? [];
 }
 
+const activityLocationCache = new Map();
+
+async function fetchTargetActivityLocation(activityId, activityType) {
+  const key = `${activityId}:${activityType}`;
+  if (activityLocationCache.has(key)) return activityLocationCache.get(key);
+  const promise = targetFetch({
+    resource: 'activity', id: activityId, type: activityType, version: 'v3',
+  })
+    .then((json) => json?.locations?.mboxes?.[0]?.name || '')
+    .catch(() => '');
+  activityLocationCache.set(key, promise);
+  return promise;
+}
+
 async function fetchTargetReporting(activityId) {
   try {
     const json = await targetFetch({ resource: 'reporting', activityId });
@@ -155,6 +169,13 @@ function extractStats(activity) {
 
 // ── Campaign card ──────────────────────────────────────────────────────────────
 
+function getActivationLocation(activity) {
+  return activity.mbox
+    || activity.locations?.mboxes?.[0]?.name
+    || (activity.campaignType && activity.variant ? `${activity.campaignType}-${activity.variant}` : '')
+    || '\u2014';
+}
+
 function buildCampaignCard(activity, wfProject, onAction) {
   const status = targetStatusToDisplay(activity.state);
   const stats = extractStats(activity);
@@ -170,11 +191,33 @@ function buildCampaignCard(activity, wfProject, onAction) {
   main.className = 'campaign-main';
   const nameEl = document.createElement('h3');
   nameEl.className = 'campaign-name';
-  nameEl.textContent = activity.name;
-  const descEl = document.createElement('p');
-  descEl.className = 'campaign-desc';
-  descEl.textContent = activity.description || generateDesc(activity);
-  main.append(nameEl, descEl);
+  const nameLabel = document.createElement('span');
+  nameLabel.className = 'campaign-field-label';
+  nameLabel.textContent = 'Activity Name:';
+  const nameValue = document.createElement('span');
+  nameValue.className = 'campaign-field-value';
+  nameValue.textContent = activity.name;
+  nameEl.append(nameLabel, nameValue);
+
+  const locEl = document.createElement('p');
+  locEl.className = 'campaign-location';
+  const locLabel = document.createElement('span');
+  locLabel.className = 'campaign-field-label';
+  locLabel.textContent = 'Activity Location:';
+  const locValue = document.createElement('span');
+  locValue.className = 'campaign-field-value';
+  const knownLocation = getActivationLocation(activity);
+  if (knownLocation && knownLocation !== '\u2014') {
+    locValue.textContent = knownLocation;
+  } else {
+    locValue.textContent = '\u2026';
+    fetchTargetActivityLocation(activity.id, activity.type).then((mbox) => {
+      locValue.textContent = mbox || '\u2014';
+    });
+  }
+  locEl.append(locLabel, locValue);
+
+  main.append(nameEl, locEl);
 
   // ── Right: status + actions
   const side = document.createElement('div');
@@ -289,11 +332,6 @@ function buildCampaignCard(activity, wfProject, onAction) {
   card.addEventListener('click', () => onAction('detail', activity, wfProject));
 
   return card;
-}
-
-function generateDesc(activity) {
-  const type = activity.type === 'xt' ? 'Experience Targeting' : activity.type === 'ab' ? 'A/B Test' : 'Campaign';
-  return `${type} activity targeting ${activity.modifiedAt ? 'customers' : 'site visitors'} with personalized content to drive engagement and conversions.`;
 }
 
 // ── Kebab menu ─────────────────────────────────────────────────────────────────
@@ -622,7 +660,7 @@ const CAMPAIGN_VARIANTS = {
         <rect x="2" y="14" width="96" height="30" fill="#1473e6" rx="2"/>
         <rect x="20" y="48" width="60" height="4" fill="#ddd" rx="1"/>
         <rect x="28" y="55" width="44" height="4" fill="#ddd" rx="1"/>
-        <rect x="35" y="62" width="30" height="6" fill="#ffcb00" rx="2"/>
+        <rect x="35" y="62" width="30" height="6" fill="#E4001C" rx="2"/>
         <rect x="2" y="71" width="96" height="7" fill="#999" rx="2"/>
       </svg>`,
     },
@@ -638,7 +676,7 @@ const CAMPAIGN_VARIANTS = {
         <rect x="54" y="18" width="40" height="4" fill="#ddd" rx="1"/>
         <rect x="54" y="25" width="32" height="4" fill="#ddd" rx="1"/>
         <rect x="54" y="32" width="36" height="4" fill="#ddd" rx="1"/>
-        <rect x="54" y="44" width="24" height="8" fill="#ffcb00" rx="2"/>
+        <rect x="54" y="44" width="24" height="8" fill="#E4001C" rx="2"/>
         <rect x="2" y="64" width="96" height="10" fill="#999" rx="2"/>
         <text x="50" y="72" font-size="5" fill="#fff" text-anchor="middle" dominant-baseline="middle" font-family="Arial">FOOTER</text>
       </svg>`,
@@ -671,7 +709,7 @@ const CAMPAIGN_VARIANTS = {
         <text x="50" y="10" font-size="5" fill="#fff" text-anchor="middle" dominant-baseline="middle" font-family="Arial">TOP NAV</text>
         <rect x="2" y="14" width="96" height="40" fill="#d7373f" rx="2"/>
         <text x="50" y="36" font-size="9" font-weight="bold" fill="#fff" text-anchor="middle" dominant-baseline="middle" font-family="Arial">FLASH SALE</text>
-        <rect x="25" y="59" width="50" height="7" fill="#ffcb00" rx="2"/>
+        <rect x="25" y="59" width="50" height="7" fill="#E4001C" rx="2"/>
         <rect x="2" y="70" width="96" height="8" fill="#999" rx="2"/>
       </svg>`,
     },
@@ -930,8 +968,6 @@ async function buildApp(activities, wfProjects, sdk) {
   const rail = document.createElement('div');
   rail.className = 'rail';
   rail.innerHTML = `
-    <div class="rail-logo" title="CMC Tool">CAT</div>
-    <div class="rail-divider"></div>
     <div class="rail-icon active" title="Campaigns">
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
@@ -953,7 +989,7 @@ async function buildApp(activities, wfProjects, sdk) {
 
   const titleWrap = document.createElement('div');
   titleWrap.className = 'header-title-wrap';
-  titleWrap.innerHTML = `<h1 class="header-title">CMC Management Tool</h1><div class="header-title-underline"></div>`;
+  titleWrap.innerHTML = `<h1 class="header-title">Personalization Tool</h1><div class="header-title-underline"></div>`;
 
   const headerActions = document.createElement('div');
   headerActions.className = 'header-actions';
@@ -1181,28 +1217,28 @@ async function buildApp(activities, wfProjects, sdk) {
 // ── Sample activities (shown when Target runtime is unavailable) ───────────────
 
 const SAMPLE_ACTIVITIES = [
-  { id: 1001, name: 'Caterpillar Connect', state: 'live', type: 'xt', modifiedAt: '2026-06-15T00:00:00Z',
+  { id: 1001, name: 'DuPont Connect', state: 'live', type: 'xt', modifiedAt: '2026-06-15T00:00:00Z',
     campaignType: 'banner', variant: 'leader-board', mbox: 'banner-leader-board',
-    description: 'A promotional campaign offering exclusive online discounts for purchasing Caterpillar machinery and equipment parts. Focused on helping businesses optimize their fleets with reliable, high-quality Caterpillar products through an easy online shopping experience.',
+    description: 'A promotional campaign highlighting DuPont\'s advanced materials portfolio, helping industrial customers source Tyvek, Kevlar and Nomex products through a streamlined online purchasing experience.',
     metrics: [{ metricType: 'display', count: 15 }, { metricType: 'click', count: 10 }, { isConversionMetric: true, count: 6 }] },
-  { id: 1002, name: 'Machine Maintenance Made Easy', state: 'live', type: 'xt', modifiedAt: '2026-06-20T00:00:00Z',
+  { id: 1002, name: 'Water Filtration Essentials', state: 'live', type: 'xt', modifiedAt: '2026-06-20T00:00:00Z',
     campaignType: 'banner', variant: 'large-rectangle', mbox: 'banner-large-rectangle',
-    description: 'An educational and eCommerce-based campaign focusing on preventive machine maintenance. Customers can access Caterpillar tools, guides, and parts for maintaining their machinery, with easy online ordering for all their needs.',
+    description: 'An educational campaign focused on water treatment and reverse osmosis system maintenance. Customers can access DuPont technical guides, sizing tools and replacement elements, with easy online ordering.',
     metrics: [{ metricType: 'display', count: 23 }, { metricType: 'click', count: 18 }, { isConversionMetric: true, count: 7 }] },
-  { id: 1003, name: 'Power Up Your Fleet', state: 'inactive', type: 'ab', modifiedAt: '2026-07-01T00:00:00Z',
+  { id: 1003, name: 'Optimize Your Production Line', state: 'inactive', type: 'ab', modifiedAt: '2026-07-01T00:00:00Z',
     campaignType: 'banner', variant: 'medium-rectangle', mbox: 'banner-medium-rectangle',
-    description: 'A promotional campaign offering exclusive online discounts for purchasing Caterpillar machinery and equipment parts. Focused on optimizing fleet performance with genuine CAT parts and accessories.',
+    description: 'A promotional campaign offering exclusive pricing on DuPont performance materials. Focused on improving throughput and durability with genuine DuPont products and accessories.',
     metrics: [] },
-  { id: 1004, name: 'Parts Finder Pro', state: 'live', type: 'xt', modifiedAt: '2026-06-10T00:00:00Z',
+  { id: 1004, name: 'Solution Finder Pro', state: 'live', type: 'xt', modifiedAt: '2026-06-10T00:00:00Z',
     campaignType: 'landing', variant: 'hero', mbox: 'landing-hero',
-    description: 'Personalized parts discovery experience helping customers find the right parts for their specific equipment models with AI-powered recommendations.',
+    description: 'Personalized product discovery helping customers identify the right DuPont material for their specific application with AI-powered recommendations.',
     metrics: [{ metricType: 'display', count: 41 }, { metricType: 'click', count: 29 }, { isConversionMetric: true, count: 14 }] },
-  { id: 1005, name: 'Dealer Locator Campaign', state: 'inactive', type: 'xt', modifiedAt: '2026-07-05T00:00:00Z',
+  { id: 1005, name: 'Distributor Locator Campaign', state: 'inactive', type: 'xt', modifiedAt: '2026-07-05T00:00:00Z',
     campaignType: 'landing', variant: 'split', mbox: 'landing-split',
-    description: 'Drive customers to their nearest authorized CAT dealer with personalized location-based messaging and exclusive dealer-specific offers.',
+    description: 'Drive customers to their nearest authorized DuPont distributor with personalized location-based messaging and exclusive distributor-specific offers.',
     metrics: [] },
-  { id: 1006, name: 'Winter Equipment Check', state: 'archived', type: 'ab', modifiedAt: '2025-12-01T00:00:00Z',
+  { id: 1006, name: 'Winter Building Envelope Check', state: 'archived', type: 'ab', modifiedAt: '2025-12-01T00:00:00Z',
     campaignType: 'specials', variant: 'seasonal', mbox: 'specials-seasonal',
-    description: 'Seasonal campaign promoting winter maintenance packages and cold-weather equipment accessories.',
+    description: 'Seasonal campaign promoting Tyvek weatherization packages and cold-weather building envelope solutions.',
     metrics: [{ metricType: 'display', count: 87 }, { metricType: 'click', count: 54 }, { isConversionMetric: true, count: 22 }] },
 ];
