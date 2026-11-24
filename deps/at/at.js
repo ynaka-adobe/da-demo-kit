@@ -65,7 +65,7 @@ async function ensureRealAtJs() {
   while (Date.now() < deadline) {
     if (window.adobe?.target?.getOffers) return;
     // eslint-disable-next-line no-await-in-loop
-    await new Promise((r) => setTimeout(r, 50));
+    await new Promise((r) => { setTimeout(r, 50); });
   }
 
   throw new Error('Loaded target-at-js but window.adobe.target.getOffers is still missing');

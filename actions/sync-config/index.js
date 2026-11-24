@@ -130,8 +130,9 @@ async function pushConfig(org, repo, configData, accessToken) {
 }
 
 async function main(params) {
+  const { __ow_method: requestMethod } = params;
   // CORS preflight
-  if (params.__ow_method === 'OPTIONS') {
+  if (requestMethod === 'OPTIONS') {
     return {
       statusCode: 204,
       headers: {

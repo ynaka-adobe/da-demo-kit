@@ -50,7 +50,8 @@ function wfRequest(method, path, domain, token, body) {
 }
 
 async function main(params) {
-  if (params.__ow_method === 'OPTIONS') {
+  const { __ow_method: requestMethod } = params;
+  if (requestMethod === 'OPTIONS') {
     return { statusCode: 204 };
   }
 
@@ -110,71 +111,97 @@ async function main(params) {
         // "I'm On" — only projects where the current user is a team member
         filterQs = '&projectUsers:userID=$$USER.ID';
       }
-      data = await wfRequest('GET',
+      data = await wfRequest(
+        'GET',
         `/PROJ/search?fields=ID,name,status,percentComplete,plannedCompletionDate,owner:name&$$LIMIT=${limit}&$$FIRST=0${filterQs}`,
-        domain, token);
+        domain,
+        token,
+      );
     } else if (resource === 'documents' && projectId) {
-      data = await wfRequest('GET',
+      data = await wfRequest(
+        'GET',
         `/DOCU/search?projectID=${projectId}&fields=ID,name,docObjCode,currentVersionID,description,owner:name,lastModDate&$$LIMIT=${limit}`,
-        domain, token);
+        domain,
+        token,
+      );
     } else if (resource === 'approval' && docVersionId) {
-      data = await wfRequest('GET',
+      data = await wfRequest(
+        'GET',
         `/DOCAPVRS/search?documentVersionID=${docVersionId}&fields=ID,status,approverDecision,reviewer:name,reviewer:emailAddr,reviewDate&$$LIMIT=50`,
-        domain, token);
+        domain,
+        token,
+      );
     } else if (resource === 'tasks' && projectId) {
-      data = await wfRequest('GET',
+      data = await wfRequest(
+        'GET',
         `/TASK/search?projectID=${projectId}&fields=ID,taskNumber,name,status,percentComplete,assignedTo:name,plannedCompletionDate&$$FIRST=0&$$LIMIT=${limit}`,
-        domain, token);
+        domain,
+        token,
+      );
     } else if (resource === 'issues' && projectId) {
-      data = await wfRequest('GET',
+      data = await wfRequest(
+        'GET',
         `/OPTASK/search?projectID=${projectId}&fields=ID,name,status,priority,assignedTo:name,plannedCompletionDate,enteredBy:name,entryDate&$$FIRST=0&$$LIMIT=${limit}`,
-        domain, token);
+        domain,
+        token,
+      );
     } else if (resource === 'create_issue') {
       if (!params.name) return { statusCode: 400, body: JSON.stringify({ error: 'Issue name is required' }) };
       if (!projectId) return { statusCode: 400, body: JSON.stringify({ error: 'projectId is required' }) };
       const issueBody = { name: params.name, projectID: projectId };
       if (params.description) issueBody.description = params.description;
-      if (params.plannedCompletionDate) issueBody.plannedCompletionDate = params.plannedCompletionDate;
+      if (params.plannedCompletionDate) {
+        issueBody.plannedCompletionDate = params.plannedCompletionDate;
+      }
       if (params.priority != null) issueBody.priority = Number(params.priority);
       if (params.assignedToID) issueBody.assignedToID = params.assignedToID;
-      data = await wfRequest('POST', `/OPTASK?fields=ID,name,status,priority`, domain, token, issueBody);
+      data = await wfRequest('POST', '/OPTASK?fields=ID,name,status,priority', domain, token, issueBody);
     } else if (resource === 'issue_statuses') {
-      data = await wfRequest('GET', `/CSOBJ/search?objCode=OPTASK&fields=ID,key,label,equatesWith&$$LIMIT=100`, domain, token);
+      data = await wfRequest('GET', '/CSOBJ/search?objCode=OPTASK&fields=ID,key,label,equatesWith&$$LIMIT=100', domain, token);
     } else if (resource === 'search_users') {
       const q = params.query || '';
       if (!q) return { statusCode: 400, body: JSON.stringify({ error: 'query required' }) };
-      data = await wfRequest('GET',
+      data = await wfRequest(
+        'GET',
         `/USER/search?name=${encodeURIComponent(q)}&name_Mod=cicontains&fields=ID,name,emailAddr&$$LIMIT=10`,
-        domain, token);
+        domain,
+        token,
+      );
     } else if (resource === 'update_issue') {
-      const issueId = params.issueId;
+      const { issueId } = params;
       if (!issueId) return { statusCode: 400, body: JSON.stringify({ error: 'issueId required' }) };
       const body = {};
       if (params.status) body.status = params.status;
       if (params.assignedToID) body.assignedToID = params.assignedToID;
-      data = await wfRequest('PUT',
+      data = await wfRequest(
+        'PUT',
         `/OPTASK/${issueId}?fields=ID,name,status,assignedTo:name`,
-        domain, token, body);
+        domain,
+        token,
+        body,
+      );
     } else if (resource === 'current_user') {
-      data = await wfRequest('GET', `/USER/search?ID=$$USER.ID&fields=ID,name,emailAddr&$$LIMIT=1`, domain, token);
+      data = await wfRequest('GET', '/USER/search?ID=$$USER.ID&fields=ID,name,emailAddr&$$LIMIT=1', domain, token);
     } else if (resource === 'create_task') {
       if (!params.name) return { statusCode: 400, body: JSON.stringify({ error: 'Task name is required' }) };
       if (!projectId) return { statusCode: 400, body: JSON.stringify({ error: 'projectId is required' }) };
       const taskBody = { name: params.name, projectID: projectId };
       if (params.description) taskBody.description = params.description;
-      if (params.plannedCompletionDate) taskBody.plannedCompletionDate = params.plannedCompletionDate;
+      if (params.plannedCompletionDate) {
+        taskBody.plannedCompletionDate = params.plannedCompletionDate;
+      }
       if (params.duration) { taskBody.duration = Number(params.duration); taskBody.durationUnit = 'D'; }
       if (params.assignedToID) taskBody.assignedToID = params.assignedToID;
-      data = await wfRequest('POST', `/TASK?fields=ID,name,taskNumber,status`, domain, token, taskBody);
+      data = await wfRequest('POST', '/TASK?fields=ID,name,taskNumber,status', domain, token, taskBody);
     } else if (resource === 'update_task') {
-      const taskId = params.taskId;
+      const { taskId } = params;
       if (!taskId) return { statusCode: 400, body: JSON.stringify({ error: 'taskId required' }) };
       const body = {};
       if (params.status) body.status = params.status;
       if (params.percentComplete != null) body.percentComplete = Number(params.percentComplete);
       data = await wfRequest('PUT', `/TASK/${taskId}?fields=ID,name,status,percentComplete`, domain, token, body);
     } else if (resource === 'task_statuses') {
-      data = await wfRequest('GET', `/CSOBJ/search?objCode=TASK&fields=ID,key,label,equatesWith&$$LIMIT=100`, domain, token);
+      data = await wfRequest('GET', '/CSOBJ/search?objCode=TASK&fields=ID,key,label,equatesWith&$$LIMIT=100', domain, token);
     } else {
       return { statusCode: 400, body: JSON.stringify({ error: `Unknown resource "${resource}"` }) };
     }

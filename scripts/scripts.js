@@ -22,6 +22,8 @@ import {
   applyTargetHeroMboxIfConfigured,
 } from './target.js';
 
+export { moveInstrumentation } from '../ue/scripts/ue-utils.js';
+
 /**
  * Builds hero block and prepends to main in a new section.
  * @param {Element} main The container element

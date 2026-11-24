@@ -92,7 +92,8 @@ async function adminPost(action, org, repo, path, token) {
 }
 
 async function main(params) {
-  if (params.__ow_method === 'OPTIONS') {
+  const { __ow_method: requestMethod } = params;
+  if (requestMethod === 'OPTIONS') {
     return {
       statusCode: 204,
       headers: {
@@ -118,10 +119,9 @@ async function main(params) {
   }
 
   // paths: comma-separated; empty segment => homepage. Default = homepage only.
-  const paths =
-    typeof params.paths === 'string'
-      ? params.paths.split(',').map((p) => p.trim())
-      : [''];
+  const paths = typeof params.paths === 'string'
+    ? params.paths.split(',').map((p) => p.trim())
+    : [''];
 
   let token = params.accessToken;
   let authError = null;
@@ -144,12 +144,14 @@ async function main(params) {
 
   // Preview each path, then live each path. Report every result.
   const results = [];
-  for (const p of paths) {
+  await paths.reduce(async (previous, p) => {
+    await previous;
     results.push(await adminPost('preview', targetOrg, targetRepo, p, token));
-  }
-  for (const p of paths) {
+  }, Promise.resolve());
+  await paths.reduce(async (previous, p) => {
+    await previous;
     results.push(await adminPost('live', targetOrg, targetRepo, p, token));
-  }
+  }, Promise.resolve());
 
   const allOk = results.every((r) => r.ok);
 

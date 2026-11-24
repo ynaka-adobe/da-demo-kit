@@ -1,1 +1,3 @@
 helix-importer-ui
+# Adobe's distributed, minified Target SDK is not maintained source.
+deps/at/vendor-at.js

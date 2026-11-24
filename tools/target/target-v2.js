@@ -16,7 +16,9 @@ async function fetchActivities() {
 
 async function fetchActivityDetails(activityId, activityType) {
   try {
-    const response = await runtimeFetch({ resource: 'activity', id: activityId, type: activityType, version: 'v3' });
+    const response = await runtimeFetch({
+      resource: 'activity', id: activityId, type: activityType, version: 'v3',
+    });
     console.log('Raw activity details response:', response);
     return response ?? {};
   } catch (err) {
@@ -35,7 +37,9 @@ async function fetchAudiences() {
   return audiences ?? [];
 }
 
-async function createXtActivity({ name, mbox, offerId, audienceId }) {
+async function createXtActivity({
+  name, mbox, offerId, audienceId,
+}) {
   return runtimeFetch({
     resource: 'create-xt',
     name,
@@ -156,7 +160,9 @@ async function showCreateXtModal(onCreated) {
       errEl.textContent = '';
 
       try {
-        const result = await createXtActivity({ name, mbox, offerId, audienceId });
+        const result = await createXtActivity({
+          name, mbox, offerId, audienceId,
+        });
         if (result.httpStatus >= 400 || result.error) {
           throw new Error(result.errors?.[0]?.message || result.error || 'Create failed');
         }
@@ -327,7 +333,7 @@ function renderActionBar(onActivityCreated) {
   changeBtn.className = 'btn-change hidden';
   changeBtn.textContent = 'Change Experience';
   changeBtn.addEventListener('click', async () => {
-    const activity = changeBtn._activity;
+    const activity = changeBtn.selectedActivity;
     changeBtn.disabled = true;
     changeBtn.textContent = 'Loading offers…';
     try {
@@ -345,7 +351,7 @@ function renderActionBar(onActivityCreated) {
   insertBtn.className = 'btn-change hidden';
   insertBtn.textContent = 'Insert into Page';
   insertBtn.addEventListener('click', async () => {
-    const activity = insertBtn._activity;
+    const activity = insertBtn.selectedActivity;
     console.log('Insert button clicked, activity:', activity);
     if (!activity) {
       console.log('No activity selected');
@@ -359,7 +365,7 @@ function renderActionBar(onActivityCreated) {
       console.log('Fetching DA context...');
       const daContext = await Promise.race([
         DA_SDK,
-        new Promise((resolve) => setTimeout(() => resolve(null), 1500)),
+        new Promise((resolve) => { setTimeout(() => resolve(null), 1500); }),
       ]);
 
       if (!daContext?.actions?.sendHTML) {
@@ -375,20 +381,20 @@ function renderActionBar(onActivityCreated) {
       console.log('Using mbox name:', mboxName);
 
       // Build empty target-offer block with one empty row
-      const offerBlockHtml = `<table><tbody>`
-        + `<tr><td>target-offer</td></tr>`
-        + `<tr><td></td></tr>`
-        + `</tbody></table>`;
+      const offerBlockHtml = '<table><tbody>'
+        + '<tr><td>target-offer</td></tr>'
+        + '<tr><td></td></tr>'
+        + '</tbody></table>';
 
       // Build metadata block with activity configuration
-      const metadataBlockHtml = `<table><tbody>`
-        + `<tr><td colspan="2">metadata</td></tr>`
+      const metadataBlockHtml = '<table><tbody>'
+        + '<tr><td colspan="2">metadata</td></tr>'
         + `<tr><td>Experience</td><td>${activity.name}</td></tr>`
-        + `<tr><td>target</td><td>on</td></tr>`
+        + '<tr><td>target</td><td>on</td></tr>'
         + `<tr><td>target-mbox-hero</td><td>${mboxName}</td></tr>`
-        + `<tr><td>target-mbox-hero-selector</td><td>.target-offer</td></tr>`
+        + '<tr><td>target-mbox-hero-selector</td><td>.target-offer</td></tr>'
         + `<tr><td>activity</td><td>${activity.id}</td></tr>`
-        + `</tbody></table>`;
+        + '</tbody></table>';
 
       // Send both blocks to be inserted into the page
       daContext.actions.sendHTML(offerBlockHtml + metadataBlockHtml);
@@ -414,8 +420,8 @@ function renderActionBar(onActivityCreated) {
     flyout.classList.add('hidden');
     changeBtn.classList.toggle('hidden', !hasSelection);
     insertBtn.classList.toggle('hidden', !hasSelection);
-    changeBtn._activity = activity;
-    insertBtn._activity = activity;
+    changeBtn.selectedActivity = activity;
+    insertBtn.selectedActivity = activity;
   };
 
   return wrapper;
@@ -500,7 +506,7 @@ function renderActivities(activities, onActivityCreated) {
 (async function init() {
   const daContext = await Promise.race([
     DA_SDK,
-    new Promise((resolve) => setTimeout(() => resolve(null), 1500)),
+    new Promise((resolve) => { setTimeout(() => resolve(null), 1500); }),
   ]);
   if (daContext) {
     const { org, repo, path } = daContext.context;
@@ -513,13 +519,13 @@ function renderActivities(activities, onActivityCreated) {
     let activities = await fetchActivities();
     document.body.innerHTML = '';
 
-    function onActivityCreated(newActivity) {
+    const onActivityCreated = (newActivity) => {
       // Prepend newly created activity to the list and re-render
       activities = [newActivity, ...activities];
       document.body.innerHTML = '';
       const { container } = renderActivities(activities, onActivityCreated);
       document.body.append(container);
-    }
+    };
 
     const { container } = renderActivities(activities, onActivityCreated);
     document.body.append(container);

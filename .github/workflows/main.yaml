@@ -11,4 +11,5 @@ jobs:
       with:
         node-version: 20
     - run: npm ci
+    - run: npm ci --prefix plugins/experimentation
     - run: npm run lint

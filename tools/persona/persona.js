@@ -166,7 +166,11 @@ const REGIONS = ['AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI
 // Navigation of window.top IS allowed cross-origin even when reading is not.
 function pageContext() {
   let navWin = window;
-  try { navWin = window.top || window.parent || window; } catch (e) { navWin = window.parent || window; }
+  try {
+    navWin = window.top || window.parent || window;
+  } catch (e) {
+    navWin = window.parent || window;
+  }
 
   try {
     const ref = new URLSearchParams(window.location.search).get('referrer');
@@ -174,13 +178,21 @@ function pageContext() {
   } catch (e) { /* noop */ }
 
   const ancestors = [];
-  try { if (window.top && window.top !== window) ancestors.push(window.top); } catch (e) { /* noop */ }
-  try { if (window.parent && window.parent !== window) ancestors.push(window.parent); } catch (e) { /* noop */ }
+  try {
+    if (window.top && window.top !== window) ancestors.push(window.top);
+  } catch (e) { /* noop */ }
+  try {
+    if (window.parent && window.parent !== window) ancestors.push(window.parent);
+  } catch (e) { /* noop */ }
   for (let i = 0; i < ancestors.length; i += 1) {
-    try { return { win: ancestors[i], url: new URL(ancestors[i].location.href) }; } catch (e) { /* cross-origin */ }
+    try {
+      return { win: ancestors[i], url: new URL(ancestors[i].location.href) };
+    } catch (e) { /* cross-origin */ }
   }
 
-  try { if (document.referrer) return { win: navWin, url: new URL(document.referrer) }; } catch (e) { /* noop */ }
+  try {
+    if (document.referrer) return { win: navWin, url: new URL(document.referrer) };
+  } catch (e) { /* noop */ }
   return { win: window, url: new URL(window.location.href) };
 }
 
@@ -225,7 +237,9 @@ function resetUrl(select, loggedin, region) {
 function getCurrentProfile() {
   const wins = [];
   try { if (window.top && window.top !== window) wins.push(window.top); } catch (e) { /* noop */ }
-  try { if (window.parent && window.parent !== window) wins.push(window.parent); } catch (e) { /* noop */ }
+  try {
+    if (window.parent && window.parent !== window) wins.push(window.parent);
+  } catch (e) { /* noop */ }
   wins.push(window);
   for (let i = 0; i < wins.length; i += 1) {
     try {
@@ -250,7 +264,9 @@ function getCurrentProfile() {
 function readParamsIntoControls(select, loggedin, region) {
   try {
     const prof = getCurrentProfile();
-    if (prof.persona >= 1 && prof.persona <= PERSONAS.length) select.value = String(prof.persona - 1);
+    if (prof.persona >= 1 && prof.persona <= PERSONAS.length) {
+      select.value = String(prof.persona - 1);
+    }
     if (typeof prof.loggedIn === 'boolean') loggedin.checked = prof.loggedIn;
     if (prof.region) region.value = String(prof.region).toUpperCase();
   } catch (e) { /* leave defaults */ }
@@ -262,8 +278,8 @@ function init() {
   const region = document.getElementById('persona-region');
 
   select.innerHTML = PERSONAS.map((p, i) => `<option value="${i}">${p.name}</option>`).join('');
-  region.innerHTML = '<option value="">Region (state)</option>'
-    + REGIONS.map((c) => `<option value="${c}">${c}</option>`).join('');
+  region.innerHTML = `<option value="">Region (state)</option>${
+    REGIONS.map((c) => `<option value="${c}">${c}</option>`).join('')}`;
 
   readParamsIntoControls(select, loggedin, region);
 

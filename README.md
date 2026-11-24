@@ -22,3 +22,13 @@ This specific repo has been _slightly_ modified to be compatible with DA's live 
 1. Start the AEM CLI: `aem up`.
 1. Open the `{repo}` folder in your favorite code editor and buil something.
 1. **Recommended:** Install common npm packages like linting and testing: `npm i`.
+
+### Linting
+
+Run `npm ci` and `npm ci --prefix plugins/experimentation` to install the locked
+dependencies for the site and the experimentation plugin's tests, then run
+`npm run lint` (the same check used by CI). The distributed, minified Adobe Target
+SDK is excluded; the maintained Target loader and all other JavaScript remain linted.
+The DA SDK's browser URL is recognized as an external module. Marketo's stylesheet
+also permits the `mkto...` class names emitted by its external Forms SDK; other
+class names still follow the standard kebab-case rule.

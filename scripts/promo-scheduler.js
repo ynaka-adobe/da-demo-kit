@@ -46,24 +46,25 @@ export default async function initPromoScheduler(container) {
   let match = null;
   let fallback = null;
 
-  for (const row of data) {
+  data.some((row) => {
     const start = row.start ? new Date(row.start) : null;
     const end = row.end ? new Date(row.end) : null;
     // Support both "fragment URL" (current sheet header) and "fragment"
     const fragment = row['fragment URL'] || row.fragment || '';
 
-    if (!fragment) continue;
+    if (!fragment) return false;
 
     if (!start && !end) {
       if (!fallback) fallback = fragment;
-      continue;
+      return false;
     }
 
     if (start && end && now >= start && now < end) {
       match = fragment;
-      break;
+      return true;
     }
-  }
+    return false;
+  });
 
   const chosen = match || fallback;
   if (!chosen) return;

@@ -71,6 +71,7 @@
 }
 
 /* ── Leader Board (728 × 90) ───────────────────────────────────── */
+
 /*  Full-width horizontal strip; image fills the left, text + CTA right  */
 
 .banner.leader-board {
@@ -117,6 +118,7 @@
 }
 
 /* ── Medium Rectangle (300 × 250) ─────────────────────────────── */
+
 /*  Compact card-style; image on top, body below; not full-width   */
 
 .banner.medium-rectangle {
@@ -147,6 +149,7 @@
 }
 
 /* ── Large Rectangle (970 × 250) ──────────────────────────────── */
+
 /*  Full-width; image left (40 %), text right; taller than leader board */
 
 .banner.large-rectangle {
@@ -197,6 +200,7 @@
 }
 
 /* ── Ribbon (full-width × ~48 px) ─────────────────────────────── */
+
 /*  Thin notification/offer strip; icon + text + CTA all in one row */
 
 .banner-wrapper.banner-ribbon-wrapper,

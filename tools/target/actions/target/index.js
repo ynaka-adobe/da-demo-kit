@@ -31,7 +31,8 @@ function targetRequest(method, path, tenant, clientId, token, body, version = 'v
 }
 
 async function main(params) {
-  if (params.__ow_method === 'OPTIONS') {
+  const { __ow_method: requestMethod, __ow_body: requestBody } = params;
+  if (requestMethod === 'OPTIONS') {
     return { statusCode: 204 };
   }
 
@@ -57,20 +58,18 @@ async function main(params) {
 
     if (resource === 'offers') {
       data = await targetRequest('GET', '/offers?sortBy=name&limit=100', tenant, clientId, token);
-
     } else if (resource === 'audiences') {
       data = await targetRequest('GET', '/audiences?limit=100', tenant, clientId, token);
-
     } else if (resource === 'audience' && params.id) {
       data = await targetRequest('GET', `/audiences/${params.id}`, tenant, clientId, token);
-
     } else if (resource === 'activity' && params.id && activityType) {
       data = await targetRequest('GET', `/activities/${activityType}/${params.id}`, tenant, clientId, token, undefined, params.version || 'v1');
-
     } else if (resource === 'create-audience') {
       // Simple audience: match a URL/mbox query parameter equal to a value.
       // Params: name (required), param (required), value (required), description (optional).
-      const { name, param, value, description } = params;
+      const {
+        name, param, value, description,
+      } = params;
       if (!name || !param || value === undefined || value === '') {
         return {
           statusCode: 400,
@@ -87,7 +86,6 @@ async function main(params) {
       };
 
       data = await targetRequest('POST', '/audiences', tenant, clientId, token, audienceDef);
-
     } else if (resource === 'create-activity') {
       // Multi-experience XT activity: one experience per audience/offer pair.
       // params: name, mbox (optional), experiences = JSON array of {audienceId, offerId}.
@@ -124,15 +122,14 @@ async function main(params) {
       };
 
       data = await targetRequest('POST', '/activities/xt', tenant, clientId, token, activityBody);
-
     } else if (resource === 'create-xt') {
-      // body arrives as a JSON string in params.__ow_body for POST, or as parsed params for GET
+      // body arrives as a JSON string in requestBody for POST, or as parsed params for GET
       let activityDef;
-      if (params.__ow_body) {
+      if (requestBody) {
         activityDef = JSON.parse(
-          Buffer.isBuffer(params.__ow_body)
-            ? params.__ow_body.toString()
-            : params.__ow_body,
+          Buffer.isBuffer(requestBody)
+            ? requestBody.toString()
+            : requestBody,
         );
       } else {
         // Passed as flat query params — reconstruct minimal definition
@@ -144,7 +141,9 @@ async function main(params) {
         };
       }
 
-      const { name, mbox = 'target-global-mbox', offerId: oId, audienceId } = activityDef;
+      const {
+        name, mbox = 'target-global-mbox', offerId: oId, audienceId,
+      } = activityDef;
 
       const experience = {
         experienceLocalId: 0,
@@ -165,7 +164,6 @@ async function main(params) {
       };
 
       data = await targetRequest('POST', '/activities/xt', tenant, clientId, token, xtBody);
-
     } else if (resource === 'update-mbox' && activityId && activityType && params.mbox) {
       const version = params.version || 'v1';
       const activity = await targetRequest('GET', `/activities/${activityType}/${activityId}`, tenant, clientId, token, undefined, version);
@@ -182,7 +180,6 @@ async function main(params) {
       }
 
       data = await targetRequest('PUT', `/activities/${activityType}/${activityId}`, tenant, clientId, token, activity, version);
-
     } else if (resource === 'update-offer' && activityId && activityType && offerId) {
       const activity = await targetRequest('GET', `/activities/${activityType}/${activityId}`, tenant, clientId, token);
 
@@ -202,7 +199,6 @@ async function main(params) {
       }
 
       data = await targetRequest('PUT', `/activities/${activityType}/${activityId}`, tenant, clientId, token, activity);
-
     } else {
       data = await targetRequest('GET', '/activities', tenant, clientId, token);
     }

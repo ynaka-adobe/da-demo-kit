@@ -4,19 +4,12 @@ import DA_SDK from 'https://da.live/nx/utils/sdk.js';
 const TARGET_RUNTIME = 'https://332794-868ceruleanwhale.adobeioruntime.net/api/v1/web/default/target-activities';
 const WF_RUNTIME = 'https://3635370-144scarletlobster.adobeioruntime.net/api/v1/web/default/workfront-planning';
 const WF_DOMAIN = 'adoberm.my.workfront.com';
-const WF_CLIENT_ID = '56e219a0a1eeae8feb55c444e3d8a8b6';
 
 // ── Utilities ──────────────────────────────────────────────────────────────────
 
 function esc(str) {
-  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-function spinner() {
-  const w = document.createElement('div');
-  w.className = 'spinner-wrap';
-  w.innerHTML = '<div class="spinner"></div>';
-  return w;
+  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 function emptyState(msg) {
@@ -57,15 +50,6 @@ async function fetchTargetActivityLocation(activityId, activityType) {
   return promise;
 }
 
-async function fetchTargetReporting(activityId) {
-  try {
-    const json = await targetFetch({ resource: 'reporting', activityId });
-    return json.report ?? null;
-  } catch {
-    return null;
-  }
-}
-
 async function activateTargetActivity(activityId) {
   const json = await targetFetch({ resource: 'activate', activityId });
   if (json.error) throw new Error(json.error);
@@ -86,8 +70,6 @@ async function createTargetActivity(params) {
 
 // ── Workfront OAuth ────────────────────────────────────────────────────────────
 
-const WF_AUTH_CHANNEL = 'cmc_wf_auth';
-
 function wfStoredToken() {
   const token = localStorage.getItem('cmc_wf_token');
   const expiry = Number(localStorage.getItem('cmc_wf_expiry') || 0);
@@ -100,12 +82,14 @@ function wfStoredToken() {
 
 function wfStoredRefresh() { return localStorage.getItem('cmc_wf_refresh'); }
 
-function wfSaveTokens({ access_token, refresh_token, expires_in }) {
-  if (access_token) {
-    localStorage.setItem('cmc_wf_token', access_token);
-    localStorage.setItem('cmc_wf_expiry', String(Date.now() + (Number(expires_in) || 36000) * 1000));
+function wfSaveTokens({
+  access_token: accessToken, refresh_token: refreshToken, expires_in: expiresIn,
+}) {
+  if (accessToken) {
+    localStorage.setItem('cmc_wf_token', accessToken);
+    localStorage.setItem('cmc_wf_expiry', String(Date.now() + (Number(expiresIn) || 36000) * 1000));
   }
-  if (refresh_token) localStorage.setItem('cmc_wf_refresh', refresh_token);
+  if (refreshToken) localStorage.setItem('cmc_wf_refresh', refreshToken);
 }
 
 async function wfRuntimeCall(params) {
@@ -115,7 +99,7 @@ async function wfRuntimeCall(params) {
 }
 
 async function wfEnsureToken() {
-  let token = wfStoredToken();
+  const token = wfStoredToken();
   if (token) return token;
   const refresh = wfStoredRefresh();
   if (refresh) {
@@ -142,12 +126,12 @@ async function wfApi(params) {
 
 function targetStatusToDisplay(state) {
   const map = {
-    live:     { key: 'live',    label: 'Live',             dot: 'live' },
-    inactive: { key: 'ready',   label: 'Ready to Publish', dot: 'ready' },
-    saved:    { key: 'draft',   label: 'Draft',            dot: 'draft' },
-    paused:   { key: 'paused',  label: 'Paused',           dot: 'paused' },
-    archived: { key: 'archived',label: 'Archived',         dot: 'archived' },
-    deleted:  { key: 'archived',label: 'Archived',         dot: 'archived' },
+    live: { key: 'live', label: 'Live', dot: 'live' },
+    inactive: { key: 'ready', label: 'Ready to Publish', dot: 'ready' },
+    saved: { key: 'draft', label: 'Draft', dot: 'draft' },
+    paused: { key: 'paused', label: 'Paused', dot: 'paused' },
+    archived: { key: 'archived', label: 'Archived', dot: 'archived' },
+    deleted: { key: 'archived', label: 'Archived', dot: 'archived' },
   };
   return map[state] || { key: state, label: state, dot: 'paused' };
 }
@@ -422,7 +406,7 @@ function buildDetailPanel() {
     // Activity info
     const infoSection = document.createElement('div');
     infoSection.className = 'detail-section';
-    const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+    const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—');
     infoSection.innerHTML = `<div class="detail-section-title">Activity Details</div>
       <div class="detail-field"><div class="detail-field-label">Status</div>
         <div class="detail-field-value"><span class="campaign-status ${status.key}" style="display:inline-flex;align-items:center;gap:6px">
@@ -461,7 +445,7 @@ function buildDetailPanel() {
 
     // Target deep-link
     const targetLink = document.createElement('a');
-    targetLink.href = `https://experience.adobe.com/#/@adoberm/target/activities`;
+    targetLink.href = 'https://experience.adobe.com/#/@adoberm/target/activities';
     targetLink.target = '_blank';
     targetLink.rel = 'noopener';
     targetLink.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#eb1000;color:#fff;border-radius:4px;text-decoration:none;font-size:13px;font-weight:600;margin-top:4px';
@@ -490,10 +474,9 @@ function parseCampaignInfo(activity) {
     };
   }
   const mboxName = activity.mbox || '';
-  for (const type of ['banner', 'landing', 'specials']) {
-    if (mboxName.startsWith(`${type}-`)) {
-      return { campaignType: type, variant: mboxName.slice(type.length + 1), mbox: mboxName };
-    }
+  const type = ['banner', 'landing', 'specials'].find((value) => mboxName.startsWith(`${value}-`));
+  if (type) {
+    return { campaignType: type, variant: mboxName.slice(type.length + 1), mbox: mboxName };
   }
   return { campaignType: 'banner', variant: 'leader-board', mbox: 'banner-leader-board' };
 }
@@ -507,10 +490,10 @@ function buildBlockHTML(campaignType, variant, campaignName, mbox) {
   const table = (header, contentRows) => {
     const cols = Math.max(...contentRows.map((r) => r.length), 1);
     const mboxRow = `<tr><td>Mbox</td><td>${esc(mbox)}</td></tr>`;
-    return `<table>`
+    return '<table>'
       + `<thead><tr><th colspan="${cols}">${header}</th></tr></thead>`
       + `<tbody>${contentRows.map(row).join('')}${mboxRow}</tbody>`
-      + `</table>`;
+      + '</table>';
   };
 
   if (campaignType === 'banner') {
@@ -526,20 +509,23 @@ function buildBlockHTML(campaignType, variant, campaignName, mbox) {
       ]);
     }
     if (variant === 'cards') {
-      return `<h2>${esc(campaignName)}</h2>`
-        + table('Cards', [
+      return `<h2>${esc(campaignName)}</h2>${
+        table('Cards', [
           ['<p>[Add image]</p><p>[Card 1 title]</p><p>[Description]</p>',
-           '<p>[Add image]</p><p>[Card 2 title]</p><p>[Description]</p>',
-           '<p>[Add image]</p><p>[Card 3 title]</p><p>[Description]</p>'],
-        ]);
+            '<p>[Add image]</p><p>[Card 2 title]</p><p>[Description]</p>',
+            '<p>[Add image]</p><p>[Card 3 title]</p><p>[Description]</p>'],
+        ])}`;
     }
     // hero
-    return table('Hero', [['<p>[Add hero image]</p>']])
-      + `<h2>${esc(campaignName)}</h2><p>[Add campaign description]</p><p><a href="#">Shop Now</a></p>`;
+    return `${table('Hero', [['<p>[Add hero image]</p>']])
+    }<h2>${esc(campaignName)}</h2><p>[Add campaign description]</p><p><a href="#">Shop Now</a></p>`;
   }
 
   if (campaignType === 'specials') {
-    const bv = variant === 'flash-sale' ? 'leader-board' : variant === 'seasonal' ? 'large-rectangle' : 'medium-rectangle';
+    const bv = {
+      'flash-sale': 'leader-board',
+      seasonal: 'large-rectangle',
+    }[variant] || 'medium-rectangle';
     return table(`Banner (${bv})`, [
       ['<p>[Add image]</p>', `<h3>${esc(campaignName)}</h3><p>[Add offer details]</p><p><a href="#">Shop Now</a></p>`],
     ]);
@@ -549,6 +535,18 @@ function buildBlockHTML(campaignType, variant, campaignName, mbox) {
 }
 
 // ── Insert campaign block into DA editor ───────────────────────────────────────
+
+function showToast(msg, type = 'success') {
+  const toast = document.createElement('div');
+  toast.className = `toast toast--${type}`;
+  toast.textContent = msg;
+  document.body.append(toast);
+  requestAnimationFrame(() => toast.classList.add('toast--visible'));
+  setTimeout(() => {
+    toast.classList.remove('toast--visible');
+    setTimeout(() => toast.remove(), 300);
+  }, 4000);
+}
 
 async function insertCampaignBlock(activity, sdk) {
   const { campaignType, variant, mbox } = parseCampaignInfo(activity);
@@ -563,21 +561,9 @@ async function insertCampaignBlock(activity, sdk) {
 
 // ── Toast notification ─────────────────────────────────────────────────────────
 
-function showToast(msg, type = 'success') {
-  const toast = document.createElement('div');
-  toast.className = `toast toast--${type}`;
-  toast.textContent = msg;
-  document.body.append(toast);
-  requestAnimationFrame(() => toast.classList.add('toast--visible'));
-  setTimeout(() => {
-    toast.classList.remove('toast--visible');
-    setTimeout(() => toast.remove(), 300);
-  }, 4000);
-}
-
 const CAMPAIGN_TYPES = [
-  { value: 'banner',   label: 'Create a Banner' },
-  { value: 'landing',  label: 'Create a Campaign Landing Page' },
+  { value: 'banner', label: 'Create a Banner' },
+  { value: 'landing', label: 'Create a Campaign Landing Page' },
   { value: 'specials', label: 'Create Specials' },
 ];
 
@@ -762,190 +748,199 @@ async function showNewCampaignModal(wfProjects, sdk, onCreated) {
   });
 
   // ── Step 1: campaign type picker ──────────────────────────────────────────
-  function showTypePicker() {
-    let selected = null;
+  const steps = {
+    showTypePicker() {
+      let selected = null;
 
-    modal.innerHTML = `
-      <div class="modal-header" style="padding-bottom:4px">
-        <div class="modal-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/>
-            <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/>
-          </svg>
+      modal.innerHTML = `
+        <div class="modal-header" style="padding-bottom:4px">
+          <div class="modal-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/>
+              <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/>
+            </svg>
+          </div>
+          <span class="modal-title">Create a Campaign</span>
         </div>
-        <span class="modal-title">Create a Campaign</span>
-      </div>
-      <div class="modal-body" style="gap:10px">
-        <p class="modal-label" style="margin:0">Pick One to Create:</p>
-        <div id="type-list" style="display:flex;flex-direction:column;gap:2px"></div>
-      </div>
-      <div class="modal-footer">
-        <button class="modal-btn-primary" id="type-next" disabled>Next</button>
-        <button class="modal-btn-cancel" id="type-cancel">Cancel</button>
-      </div>`;
+        <div class="modal-body" style="gap:10px">
+          <p class="modal-label" style="margin:0">Pick One to Create:</p>
+          <div id="type-list" style="display:flex;flex-direction:column;gap:2px"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="modal-btn-primary" id="type-next" disabled>Next</button>
+          <button class="modal-btn-cancel" id="type-cancel">Cancel</button>
+        </div>`;
 
-    const typeList = modal.querySelector('#type-list');
-    const nextBtn = modal.querySelector('#type-next');
+      const typeList = modal.querySelector('#type-list');
+      const nextBtn = modal.querySelector('#type-next');
 
-    CAMPAIGN_TYPES.forEach(({ value, label }) => {
-      const row = document.createElement('label');
-      row.className = 'type-option-row';
-      row.innerHTML = `<input type="radio" name="campaign-type" value="${value}"> ${esc(label)}`;
-      row.querySelector('input').addEventListener('change', () => {
-        selected = value;
-        nextBtn.disabled = false;
-        typeList.querySelectorAll('.type-option-row').forEach((r) => r.classList.remove('selected'));
-        row.classList.add('selected');
+      CAMPAIGN_TYPES.forEach(({ value, label }) => {
+        const row = document.createElement('label');
+        row.className = 'type-option-row';
+        row.innerHTML = `<input type="radio" name="campaign-type" value="${value}"> ${esc(label)}`;
+        row.querySelector('input').addEventListener('change', () => {
+          selected = value;
+          nextBtn.disabled = false;
+          typeList.querySelectorAll('.type-option-row').forEach((r) => r.classList.remove('selected'));
+          row.classList.add('selected');
+        });
+        typeList.append(row);
       });
-      typeList.append(row);
-    });
 
-    modal.querySelector('#type-cancel').addEventListener('click', close);
-    nextBtn.addEventListener('click', () => { if (selected) showVariantPicker(selected); });
-  }
+      modal.querySelector('#type-cancel').addEventListener('click', close);
+      nextBtn.addEventListener('click', () => { if (selected) steps.showVariantPicker(selected); });
+    },
+
+    showVariantPicker(campaignType) {
+      const typeLabel = CAMPAIGN_TYPES.find((t) => t.value === campaignType)?.label || campaignType;
+      const variants = CAMPAIGN_VARIANTS[campaignType] || [];
+      let selected = null;
+
+      modal.innerHTML = `
+        <div class="modal-header" style="padding-bottom:4px">
+          <div class="modal-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/>
+              <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/>
+            </svg>
+          </div>
+          <span class="modal-title">${esc(typeLabel)}</span>
+        </div>
+        <div class="modal-body" style="gap:8px;padding-top:12px">
+          <p class="modal-label" style="margin:0 0 4px">Select Banner Type</p>
+          <div id="variant-list" class="variant-list"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="modal-btn-primary" id="var-next" disabled>Next</button>
+          <button class="modal-btn-cancel" id="var-back">← Back</button>
+        </div>`;
+
+      const variantList = modal.querySelector('#variant-list');
+      const nextBtn = modal.querySelector('#var-next');
+
+      variants.forEach((variant) => {
+        const card = document.createElement('div');
+        card.className = 'variant-card';
+        card.innerHTML = `
+          <div class="variant-card-info">
+            <div class="variant-card-name">${esc(variant.label)}</div>
+            <div class="variant-card-desc">${esc(variant.desc)}</div>
+          </div>
+          <div class="variant-card-preview">${variant.preview}</div>
+          <input type="radio" name="campaign-variant" value="${esc(variant.value)}" class="variant-card-radio">`;
+
+        card.addEventListener('click', () => {
+          selected = variant.value;
+          nextBtn.disabled = false;
+          variantList.querySelectorAll('.variant-card').forEach((c) => c.classList.remove('selected'));
+          card.classList.add('selected');
+          card.querySelector('input').checked = true;
+        });
+
+        variantList.append(card);
+      });
+
+      modal.querySelector('#var-back').addEventListener('click', steps.showTypePicker);
+      nextBtn.addEventListener('click', () => {
+        if (selected) steps.showDetailsForm(campaignType, selected);
+      });
+    },
+
+    showDetailsForm(campaignType, variant) {
+      const typeLabel = CAMPAIGN_TYPES.find((t) => t.value === campaignType)?.label || campaignType;
+      const variantLabel = (CAMPAIGN_VARIANTS[campaignType] || [])
+        .find((v) => v.value === variant)?.label || variant;
+
+      modal.innerHTML = `
+        <div class="modal-header">
+          <div class="modal-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/>
+              <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/>
+            </svg>
+          </div>
+          <div>
+            <div class="modal-title">${esc(typeLabel)}</div>
+            <div style="font-size:12px;color:#888;margin-top:2px">${esc(variantLabel)}</div>
+          </div>
+        </div>
+        <div class="modal-body">
+          <div class="modal-field">
+            <label class="modal-label">Campaign Name <span class="modal-required">*</span></label>
+            <input class="modal-input" id="nc-name" placeholder="e.g. Summer Parts Promo" autocomplete="off">
+          </div>
+          <div class="modal-field">
+            <label class="modal-label">Description</label>
+            <textarea class="modal-textarea" id="nc-desc" placeholder="Describe the campaign goal…"></textarea>
+          </div>
+          <div class="modal-field">
+            <label class="modal-label">Target Mbox</label>
+            <div style="font-size:13px;color:#555;background:#f5f5f5;border:1px solid #e0e0e0;border-radius:4px;padding:8px 12px;font-family:monospace">${campaignType}-${variant}</div>
+          </div>
+          ${wfProjects && wfProjects.length ? `
+          <div class="modal-field">
+            <label class="modal-label">Workfront Project (optional)</label>
+            <select class="modal-select" id="nc-wf">
+              <option value="">— None —</option>
+              ${wfProjects.map((p) => `<option value="${esc(p.ID)}">${esc(p.name)}</option>`).join('')}
+            </select>
+          </div>` : ''}
+        </div>
+        <div class="modal-footer">
+          <button class="modal-btn-primary" id="nc-submit">Create Campaign</button>
+          <button class="modal-btn-cancel" id="nc-back">← Back</button>
+        </div>`;
+
+      const nameInput = modal.querySelector('#nc-name');
+      const submitBtn = modal.querySelector('#nc-submit');
+      nameInput.focus();
+
+      modal.querySelector('#nc-back').addEventListener('click', () => steps.showVariantPicker(campaignType));
+
+      submitBtn.addEventListener('click', async () => {
+        const name = nameInput.value.trim();
+        if (!name) { nameInput.classList.add('error'); nameInput.focus(); return; }
+        nameInput.classList.remove('error');
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Creating…';
+
+        // Derive mbox from campaign type + variant (e.g. "banner-leader-board")
+        const mbox = `${campaignType}-${variant}`;
+
+        try {
+          // 1. Insert block table at the DA editor cursor position
+          const blockHTML = buildBlockHTML(campaignType, variant, name);
+          if (sdk?.actions?.sendHTML) {
+            await sdk.actions.sendHTML(blockHTML);
+          }
+
+          // 2. Create Target activity with the variant-derived mbox
+          const result = await createTargetActivity({
+            name, mbox, campaignType, variant,
+          });
+
+          close();
+          showToast(`✓ "${name}" created — mbox: ${mbox}`);
+          onCreated(result);
+        } catch (err) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Create Campaign';
+          let errEl = modal.querySelector('.modal-error');
+          if (!errEl) { errEl = document.createElement('p'); errEl.className = 'modal-error'; modal.querySelector('.modal-footer').prepend(errEl); }
+          errEl.textContent = `Error: ${err.message}`;
+        }
+      });
+    },
+  };
 
   // ── Step 2: variant picker ────────────────────────────────────────────────
-  function showVariantPicker(campaignType) {
-    const typeLabel = CAMPAIGN_TYPES.find((t) => t.value === campaignType)?.label || campaignType;
-    const variants = CAMPAIGN_VARIANTS[campaignType] || [];
-    let selected = null;
-
-    modal.innerHTML = `
-      <div class="modal-header" style="padding-bottom:4px">
-        <div class="modal-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/>
-            <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/>
-          </svg>
-        </div>
-        <span class="modal-title">${esc(typeLabel)}</span>
-      </div>
-      <div class="modal-body" style="gap:8px;padding-top:12px">
-        <p class="modal-label" style="margin:0 0 4px">Select Banner Type</p>
-        <div id="variant-list" class="variant-list"></div>
-      </div>
-      <div class="modal-footer">
-        <button class="modal-btn-primary" id="var-next" disabled>Next</button>
-        <button class="modal-btn-cancel" id="var-back">← Back</button>
-      </div>`;
-
-    const variantList = modal.querySelector('#variant-list');
-    const nextBtn = modal.querySelector('#var-next');
-
-    variants.forEach((variant) => {
-      const card = document.createElement('div');
-      card.className = 'variant-card';
-      card.innerHTML = `
-        <div class="variant-card-info">
-          <div class="variant-card-name">${esc(variant.label)}</div>
-          <div class="variant-card-desc">${esc(variant.desc)}</div>
-        </div>
-        <div class="variant-card-preview">${variant.preview}</div>
-        <input type="radio" name="campaign-variant" value="${esc(variant.value)}" class="variant-card-radio">`;
-
-      card.addEventListener('click', () => {
-        selected = variant.value;
-        nextBtn.disabled = false;
-        variantList.querySelectorAll('.variant-card').forEach((c) => c.classList.remove('selected'));
-        card.classList.add('selected');
-        card.querySelector('input').checked = true;
-      });
-
-      variantList.append(card);
-    });
-
-    modal.querySelector('#var-back').addEventListener('click', showTypePicker);
-    nextBtn.addEventListener('click', () => { if (selected) showDetailsForm(campaignType, selected); });
-  }
 
   // ── Step 3: campaign details form ─────────────────────────────────────────
-  function showDetailsForm(campaignType, variant) {
-    const typeLabel = CAMPAIGN_TYPES.find((t) => t.value === campaignType)?.label || campaignType;
-    const variantLabel = (CAMPAIGN_VARIANTS[campaignType] || []).find((v) => v.value === variant)?.label || variant;
-
-    modal.innerHTML = `
-      <div class="modal-header">
-        <div class="modal-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/>
-            <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/>
-          </svg>
-        </div>
-        <div>
-          <div class="modal-title">${esc(typeLabel)}</div>
-          <div style="font-size:12px;color:#888;margin-top:2px">${esc(variantLabel)}</div>
-        </div>
-      </div>
-      <div class="modal-body">
-        <div class="modal-field">
-          <label class="modal-label">Campaign Name <span class="modal-required">*</span></label>
-          <input class="modal-input" id="nc-name" placeholder="e.g. Summer Parts Promo" autocomplete="off">
-        </div>
-        <div class="modal-field">
-          <label class="modal-label">Description</label>
-          <textarea class="modal-textarea" id="nc-desc" placeholder="Describe the campaign goal…"></textarea>
-        </div>
-        <div class="modal-field">
-          <label class="modal-label">Target Mbox</label>
-          <div style="font-size:13px;color:#555;background:#f5f5f5;border:1px solid #e0e0e0;border-radius:4px;padding:8px 12px;font-family:monospace">${campaignType}-${variant}</div>
-        </div>
-        ${wfProjects && wfProjects.length ? `
-        <div class="modal-field">
-          <label class="modal-label">Workfront Project (optional)</label>
-          <select class="modal-select" id="nc-wf">
-            <option value="">— None —</option>
-            ${wfProjects.map((p) => `<option value="${esc(p.ID)}">${esc(p.name)}</option>`).join('')}
-          </select>
-        </div>` : ''}
-      </div>
-      <div class="modal-footer">
-        <button class="modal-btn-primary" id="nc-submit">Create Campaign</button>
-        <button class="modal-btn-cancel" id="nc-back">← Back</button>
-      </div>`;
-
-    const nameInput = modal.querySelector('#nc-name');
-    const submitBtn = modal.querySelector('#nc-submit');
-    nameInput.focus();
-
-    modal.querySelector('#nc-back').addEventListener('click', () => showVariantPicker(campaignType));
-
-    submitBtn.addEventListener('click', async () => {
-      const name = nameInput.value.trim();
-      if (!name) { nameInput.classList.add('error'); nameInput.focus(); return; }
-      nameInput.classList.remove('error');
-
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Creating…';
-
-      // Derive mbox from campaign type + variant (e.g. "banner-leader-board")
-      const mbox = `${campaignType}-${variant}`;
-
-      try {
-        // 1. Insert block table at the DA editor cursor position
-        const blockHTML = buildBlockHTML(campaignType, variant, name);
-        if (sdk?.actions?.sendHTML) {
-          await sdk.actions.sendHTML(blockHTML);
-        }
-
-        // 2. Create Target activity with the variant-derived mbox
-        const result = await createTargetActivity({ name, mbox, campaignType, variant });
-
-        close();
-        showToast(`✓ "${name}" created — mbox: ${mbox}`);
-        onCreated(result);
-      } catch (err) {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Create Campaign';
-        let errEl = modal.querySelector('.modal-error');
-        if (!errEl) { errEl = document.createElement('p'); errEl.className = 'modal-error'; modal.querySelector('.modal-footer').prepend(errEl); }
-        errEl.textContent = `Error: ${err.message}`;
-      }
-    });
-  }
 
   overlay.append(modal);
   document.body.append(overlay);
-  showTypePicker();
+  steps.showTypePicker();
 }
 
 // ── WF connect prompt ──────────────────────────────────────────────────────────
@@ -953,10 +948,6 @@ async function showNewCampaignModal(wfProjects, sdk, onCreated) {
 // Redirect URI is the Runtime action itself — a fixed, domain-independent
 // URL registered once with Workfront. It exchanges the code and postMessages
 // the tokens back to this page's origin (passed via `state`).
-function buildWfAuthUrl() {
-  return `https://${WF_DOMAIN}/integrations/oauth2/authorize?client_id=${WF_CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(WF_RUNTIME)}`
-    + `&state=${encodeURIComponent(location.origin)}`;
-}
 
 // ── Main app ───────────────────────────────────────────────────────────────────
 
@@ -989,7 +980,7 @@ async function buildApp(activities, wfProjects, sdk) {
 
   const titleWrap = document.createElement('div');
   titleWrap.className = 'header-title-wrap';
-  titleWrap.innerHTML = `<h1 class="header-title">Personalization Tool</h1><div class="header-title-underline"></div>`;
+  titleWrap.innerHTML = '<h1 class="header-title">Personalization Tool</h1><div class="header-title-underline"></div>';
 
   const headerActions = document.createElement('div');
   headerActions.className = 'header-actions';
@@ -999,7 +990,7 @@ async function buildApp(activities, wfProjects, sdk) {
   newBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
     <path d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"/>
   </svg> New Campaign`;
-  newBtn.addEventListener('click', () => showNewCampaignModal(wfProjects, sdk, (result) => { location.reload(); }));
+  newBtn.addEventListener('click', () => showNewCampaignModal(wfProjects, sdk, () => { window.location.reload(); }));
 
   const bellBtn = document.createElement('button');
   bellBtn.className = 'header-icon-btn';
@@ -1055,7 +1046,7 @@ async function buildApp(activities, wfProjects, sdk) {
   </svg> Sort by:`;
   const sortSelect = document.createElement('select');
   sortSelect.className = 'sort-select';
-  sortSelect.innerHTML = `<option value="date">Date Modified</option><option value="status">Status</option><option value="name">Name</option>`;
+  sortSelect.innerHTML = '<option value="date">Date Modified</option><option value="status">Status</option><option value="name">Name</option>';
   sortWrap.append(sortSelect);
 
   tabSortBar.append(tabList, sortWrap);
@@ -1072,90 +1063,95 @@ async function buildApp(activities, wfProjects, sdk) {
   // Build detail panel
   const detailPanel = buildDetailPanel();
 
-  function handleAction(action, activity, extra) {
-    if (action === 'insert') {
-      insertCampaignBlock(activity, sdk);
-    } else if (action === 'detail') {
-      const wfProj = extra || wfProjects?.find((p) => p._linkedCampaignId === String(activity.id)) || null;
-      detailPanel.show(activity, wfProj);
-    } else if (action === 'monitor') {
-      window.open(`https://experience.adobe.com/#/@adoberm/target/activities`, '_blank', 'noopener');
-    } else if (action === 'kebab') {
-      showKebabMenu(activity, extra, (kAction, act) => handleKebabAction(kAction, act));
-    } else if (action === 'refresh') {
-      renderList();
-    }
-  }
+  const campaigns = {
+    handleAction(action, activity, extra) {
+      if (action === 'insert') {
+        insertCampaignBlock(activity, sdk);
+      } else if (action === 'detail') {
+        const wfProj = extra
+          || wfProjects?.find((p) => p.linkedCampaignId === String(activity.id)) || null;
+        detailPanel.show(activity, wfProj);
+      } else if (action === 'monitor') {
+        window.open('https://experience.adobe.com/#/@adoberm/target/activities', '_blank', 'noopener');
+      } else if (action === 'kebab') {
+        showKebabMenu(activity, extra, (kAction, act) => campaigns.handleKebabAction(kAction, act));
+      } else if (action === 'refresh') {
+        campaigns.renderList();
+      }
+    },
 
-  async function handleKebabAction(action, activity) {
-    if (action === 'detail') {
-      const wfProj = wfProjects?.find((p) => p._linkedCampaignId === String(activity.id)) || null;
-      detailPanel.show(activity, wfProj);
-    } else if (action === 'monitor') {
-      window.open(`https://experience.adobe.com/#/@adoberm/target/activities`, '_blank', 'noopener');
-    } else if (action === 'activate') {
-      try {
-        await activateTargetActivity(activity.id);
-        activity.state = 'live';
-        renderList();
-      } catch (err) {
-        alert(`Failed to activate: ${err.message}`);
+    async handleKebabAction(action, activity) {
+      if (action === 'detail') {
+        const wfProj = wfProjects?.find((p) => p.linkedCampaignId === String(activity.id)) || null;
+        detailPanel.show(activity, wfProj);
+      } else if (action === 'monitor') {
+        window.open('https://experience.adobe.com/#/@adoberm/target/activities', '_blank', 'noopener');
+      } else if (action === 'activate') {
+        try {
+          await activateTargetActivity(activity.id);
+          activity.state = 'live';
+          campaigns.renderList();
+        } catch (err) {
+          alert(`Failed to activate: ${err.message}`);
+        }
+      } else if (action === 'pause') {
+        try {
+          await deactivateTargetActivity(activity.id);
+          activity.state = 'inactive';
+          campaigns.renderList();
+        } catch (err) {
+          alert(`Failed to pause: ${err.message}`);
+        }
+      } else if (action === 'archive') {
+        if (window.confirm(`Archive "${activity.name}"? It will move to the Archived tab.`)) {
+          activity.state = 'archived';
+          campaigns.renderList();
+        }
+      } else if (action === 'link-wf') {
+        if (!wfProjects || !wfProjects.length) {
+          alert('No Workfront projects available. Make sure you are connected to Workfront.');
+          return;
+        }
+        const names = wfProjects.map((p, i) => `${i + 1}. ${p.name}`).join('\n');
+        const choice = prompt(`Choose a Workfront project to link:\n\n${names}\n\nEnter number:`);
+        const idx = Number(choice) - 1;
+        if (idx >= 0 && idx < wfProjects.length) {
+          wfProjects[idx].linkedCampaignId = String(activity.id);
+          alert(`Linked to: ${wfProjects[idx].name}`);
+          campaigns.renderList();
+        }
       }
-    } else if (action === 'pause') {
-      try {
-        await deactivateTargetActivity(activity.id);
-        activity.state = 'inactive';
-        renderList();
-      } catch (err) {
-        alert(`Failed to pause: ${err.message}`);
-      }
-    } else if (action === 'archive') {
-      if (confirm(`Archive "${activity.name}"? It will move to the Archived tab.`)) {
-        activity.state = 'archived';
-        renderList();
-      }
-    } else if (action === 'link-wf') {
-      if (!wfProjects || !wfProjects.length) {
-        alert('No Workfront projects available. Make sure you are connected to Workfront.');
+    },
+
+    sortActivities(list) {
+      if (sortKey === 'name') return [...list].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      if (sortKey === 'date') return [...list].sort((a, b) => new Date(b.modifiedAt || 0) - new Date(a.modifiedAt || 0));
+      // status: live first, then ready, then others
+      const order = {
+        live: 0, inactive: 1, saved: 2, paused: 3,
+      };
+      return [...list].sort((a, b) => (order[a.state] ?? 9) - (order[b.state] ?? 9));
+    },
+
+    renderList() {
+      listEl.innerHTML = '';
+      const base = activeTab === 'active' ? activeActivities : archivedActivities;
+      let filtered = searchQuery
+        ? base.filter((a) => (a.name || '').toLowerCase().includes(searchQuery.toLowerCase()))
+        : base;
+      filtered = campaigns.sortActivities(filtered);
+
+      if (!filtered.length) {
+        listEl.append(emptyState(searchQuery ? 'No campaigns match your search.' : 'No campaigns here.'));
         return;
       }
-      const names = wfProjects.map((p, i) => `${i + 1}. ${p.name}`).join('\n');
-      const choice = prompt(`Choose a Workfront project to link:\n\n${names}\n\nEnter number:`);
-      const idx = Number(choice) - 1;
-      if (idx >= 0 && idx < wfProjects.length) {
-        wfProjects[idx]._linkedCampaignId = String(activity.id);
-        alert(`Linked to: ${wfProjects[idx].name}`);
-        renderList();
-      }
-    }
-  }
 
-  function sortActivities(list) {
-    if (sortKey === 'name') return [...list].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    if (sortKey === 'date') return [...list].sort((a, b) => new Date(b.modifiedAt || 0) - new Date(a.modifiedAt || 0));
-    // status: live first, then ready, then others
-    const order = { live: 0, inactive: 1, saved: 2, paused: 3 };
-    return [...list].sort((a, b) => (order[a.state] ?? 9) - (order[b.state] ?? 9));
-  }
-
-  function renderList() {
-    listEl.innerHTML = '';
-    const base = activeTab === 'active' ? activeActivities : archivedActivities;
-    let filtered = searchQuery
-      ? base.filter((a) => (a.name || '').toLowerCase().includes(searchQuery.toLowerCase()))
-      : base;
-    filtered = sortActivities(filtered);
-
-    if (!filtered.length) {
-      listEl.append(emptyState(searchQuery ? 'No campaigns match your search.' : 'No campaigns here.'));
-      return;
-    }
-
-    filtered.forEach((activity) => {
-      const wfProj = wfProjects?.find((p) => p._linkedCampaignId === String(activity.id)) || null;
-      listEl.append(buildCampaignCard(activity, wfProj, handleAction));
-    });
-  }
+      filtered.forEach((activity) => {
+        const wfProj = wfProjects?.find((p) => p.linkedCampaignId === String(activity.id)) || null;
+        listEl.append(buildCampaignCard(activity, wfProj, campaigns.handleAction));
+      });
+    },
+  };
 
   // Tab switching
   tabList.querySelectorAll('.tab-btn').forEach((btn) => {
@@ -1163,19 +1159,19 @@ async function buildApp(activities, wfProjects, sdk) {
       if (btn.dataset.tab === activeTab) return;
       activeTab = btn.dataset.tab;
       tabList.querySelectorAll('.tab-btn').forEach((b) => b.classList.toggle('active', b.dataset.tab === activeTab));
-      renderList();
+      campaigns.renderList();
     });
   });
 
   // Search
-  searchInput.addEventListener('input', () => { searchQuery = searchInput.value; renderList(); });
-  searchBtn.addEventListener('click', () => { searchQuery = searchInput.value; renderList(); });
-  searchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { searchQuery = searchInput.value; renderList(); } });
+  searchInput.addEventListener('input', () => { searchQuery = searchInput.value; campaigns.renderList(); });
+  searchBtn.addEventListener('click', () => { searchQuery = searchInput.value; campaigns.renderList(); });
+  searchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { searchQuery = searchInput.value; campaigns.renderList(); } });
 
   // Sort
-  sortSelect.addEventListener('change', () => { sortKey = sortSelect.value; renderList(); });
+  sortSelect.addEventListener('change', () => { sortKey = sortSelect.value; campaigns.renderList(); });
 
-  renderList();
+  campaigns.renderList();
 
   content.append(header, searchBar, tabSortBar, listEl);
   shell.append(rail, content);
@@ -1184,8 +1180,83 @@ async function buildApp(activities, wfProjects, sdk) {
 
 // ── Bootstrap ──────────────────────────────────────────────────────────────────
 
+const SAMPLE_ACTIVITIES = [
+  {
+    id: 1001,
+    name: 'DuPont Connect',
+    state: 'live',
+    type: 'xt',
+    modifiedAt: '2026-06-15T00:00:00Z',
+    campaignType: 'banner',
+    variant: 'leader-board',
+    mbox: 'banner-leader-board',
+    description: 'A promotional campaign highlighting DuPont\'s advanced materials portfolio, helping industrial customers source Tyvek, Kevlar and Nomex products through a streamlined online purchasing experience.',
+    metrics: [{ metricType: 'display', count: 15 }, { metricType: 'click', count: 10 }, { isConversionMetric: true, count: 6 }],
+  },
+  {
+    id: 1002,
+    name: 'Water Filtration Essentials',
+    state: 'live',
+    type: 'xt',
+    modifiedAt: '2026-06-20T00:00:00Z',
+    campaignType: 'banner',
+    variant: 'large-rectangle',
+    mbox: 'banner-large-rectangle',
+    description: 'An educational campaign focused on water treatment and reverse osmosis system maintenance. Customers can access DuPont technical guides, sizing tools and replacement elements, with easy online ordering.',
+    metrics: [{ metricType: 'display', count: 23 }, { metricType: 'click', count: 18 }, { isConversionMetric: true, count: 7 }],
+  },
+  {
+    id: 1003,
+    name: 'Optimize Your Production Line',
+    state: 'inactive',
+    type: 'ab',
+    modifiedAt: '2026-07-01T00:00:00Z',
+    campaignType: 'banner',
+    variant: 'medium-rectangle',
+    mbox: 'banner-medium-rectangle',
+    description: 'A promotional campaign offering exclusive pricing on DuPont performance materials. Focused on improving throughput and durability with genuine DuPont products and accessories.',
+    metrics: [],
+  },
+  {
+    id: 1004,
+    name: 'Solution Finder Pro',
+    state: 'live',
+    type: 'xt',
+    modifiedAt: '2026-06-10T00:00:00Z',
+    campaignType: 'landing',
+    variant: 'hero',
+    mbox: 'landing-hero',
+    description: 'Personalized product discovery helping customers identify the right DuPont material for their specific application with AI-powered recommendations.',
+    metrics: [{ metricType: 'display', count: 41 }, { metricType: 'click', count: 29 }, { isConversionMetric: true, count: 14 }],
+  },
+  {
+    id: 1005,
+    name: 'Distributor Locator Campaign',
+    state: 'inactive',
+    type: 'xt',
+    modifiedAt: '2026-07-05T00:00:00Z',
+    campaignType: 'landing',
+    variant: 'split',
+    mbox: 'landing-split',
+    description: 'Drive customers to their nearest authorized DuPont distributor with personalized location-based messaging and exclusive distributor-specific offers.',
+    metrics: [],
+  },
+  {
+    id: 1006,
+    name: 'Winter Building Envelope Check',
+    state: 'archived',
+    type: 'ab',
+    modifiedAt: '2025-12-01T00:00:00Z',
+    campaignType: 'specials',
+    variant: 'seasonal',
+    mbox: 'specials-seasonal',
+    description: 'Seasonal campaign promoting Tyvek weatherization packages and cold-weather building envelope solutions.',
+    metrics: [{ metricType: 'display', count: 87 }, { metricType: 'click', count: 54 }, { isConversionMetric: true, count: 22 }],
+  },
+];
+
 (async function init() {
-  const sdk = await Promise.race([DA_SDK, new Promise((r) => setTimeout(r, 1500))]);
+  const sdk = await Promise.race([DA_SDK, new Promise((r) => { setTimeout(r, 1500); })]);
 
   // Loading screen
   document.body.innerHTML = '<div class="connect-screen"><div class="spinner-wrap"><div class="spinner"></div></div><p>Loading campaigns…</p></div>';
@@ -1215,30 +1286,3 @@ async function buildApp(activities, wfProjects, sdk) {
 }());
 
 // ── Sample activities (shown when Target runtime is unavailable) ───────────────
-
-const SAMPLE_ACTIVITIES = [
-  { id: 1001, name: 'DuPont Connect', state: 'live', type: 'xt', modifiedAt: '2026-06-15T00:00:00Z',
-    campaignType: 'banner', variant: 'leader-board', mbox: 'banner-leader-board',
-    description: 'A promotional campaign highlighting DuPont\'s advanced materials portfolio, helping industrial customers source Tyvek, Kevlar and Nomex products through a streamlined online purchasing experience.',
-    metrics: [{ metricType: 'display', count: 15 }, { metricType: 'click', count: 10 }, { isConversionMetric: true, count: 6 }] },
-  { id: 1002, name: 'Water Filtration Essentials', state: 'live', type: 'xt', modifiedAt: '2026-06-20T00:00:00Z',
-    campaignType: 'banner', variant: 'large-rectangle', mbox: 'banner-large-rectangle',
-    description: 'An educational campaign focused on water treatment and reverse osmosis system maintenance. Customers can access DuPont technical guides, sizing tools and replacement elements, with easy online ordering.',
-    metrics: [{ metricType: 'display', count: 23 }, { metricType: 'click', count: 18 }, { isConversionMetric: true, count: 7 }] },
-  { id: 1003, name: 'Optimize Your Production Line', state: 'inactive', type: 'ab', modifiedAt: '2026-07-01T00:00:00Z',
-    campaignType: 'banner', variant: 'medium-rectangle', mbox: 'banner-medium-rectangle',
-    description: 'A promotional campaign offering exclusive pricing on DuPont performance materials. Focused on improving throughput and durability with genuine DuPont products and accessories.',
-    metrics: [] },
-  { id: 1004, name: 'Solution Finder Pro', state: 'live', type: 'xt', modifiedAt: '2026-06-10T00:00:00Z',
-    campaignType: 'landing', variant: 'hero', mbox: 'landing-hero',
-    description: 'Personalized product discovery helping customers identify the right DuPont material for their specific application with AI-powered recommendations.',
-    metrics: [{ metricType: 'display', count: 41 }, { metricType: 'click', count: 29 }, { isConversionMetric: true, count: 14 }] },
-  { id: 1005, name: 'Distributor Locator Campaign', state: 'inactive', type: 'xt', modifiedAt: '2026-07-05T00:00:00Z',
-    campaignType: 'landing', variant: 'split', mbox: 'landing-split',
-    description: 'Drive customers to their nearest authorized DuPont distributor with personalized location-based messaging and exclusive distributor-specific offers.',
-    metrics: [] },
-  { id: 1006, name: 'Winter Building Envelope Check', state: 'archived', type: 'ab', modifiedAt: '2025-12-01T00:00:00Z',
-    campaignType: 'specials', variant: 'seasonal', mbox: 'specials-seasonal',
-    description: 'Seasonal campaign promoting Tyvek weatherization packages and cold-weather building envelope solutions.',
-    metrics: [{ metricType: 'display', count: 87 }, { metricType: 'click', count: 54 }, { isConversionMetric: true, count: 22 }] },
-];

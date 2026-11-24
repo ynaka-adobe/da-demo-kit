@@ -12,12 +12,14 @@ function storedToken() {
   return token || null;
 }
 function storedRefresh() { return localStorage.getItem('wf_refresh_token'); }
-function saveTokens({ access_token, refresh_token, expires_in }) {
-  if (access_token) {
-    localStorage.setItem('wf_access_token', access_token);
-    localStorage.setItem('wf_token_expiry', String(Date.now() + (Number(expires_in) || 36000) * 1000));
+function saveTokens({
+  access_token: accessToken, refresh_token: refreshToken, expires_in: expiresIn,
+}) {
+  if (accessToken) {
+    localStorage.setItem('wf_access_token', accessToken);
+    localStorage.setItem('wf_token_expiry', String(Date.now() + (Number(expiresIn) || 36000) * 1000));
   }
-  if (refresh_token) localStorage.setItem('wf_refresh_token', refresh_token);
+  if (refreshToken) localStorage.setItem('wf_refresh_token', refreshToken);
 }
 
 async function runtimeCall(params) {
@@ -27,7 +29,7 @@ async function runtimeCall(params) {
 }
 
 async function ensureToken() {
-  let token = storedToken();
+  const token = storedToken();
   if (token) return token;
   const refresh = storedRefresh();
   if (refresh) {
@@ -44,8 +46,6 @@ async function api(params) {
   if (!token) return null;
   return runtimeCall({ ...params, wf_token: token });
 }
-
-init();
 
 // ── UI helpers ────────────────────────────────────────────────────────────────
 
@@ -147,159 +147,165 @@ function showToast(msg, type = 'success') {
 
 // ── Main app ──────────────────────────────────────────────────────────────────
 
-async function init() {
-  const token = await ensureToken();
-  if (!token) { renderConnect(); return; }
-  renderApp();
-}
+const views = {
+  async init() {
+    const token = await ensureToken();
+    if (!token) { views.renderConnect(); return; }
+    views.renderApp();
+  },
 
-function renderConnect() {
-  document.body.innerHTML = '';
-  const shell = el('div', 'ap-shell');
-  const header = el('div', 'ap-header');
-  header.innerHTML = `<span class="ap-logo">CAT</span><span class="ap-title">Mark Task Complete</span>`;
-  const body = el('div', 'ap-connect');
-  body.innerHTML = `<p>Connect your Workfront account to mark tasks as complete.</p>`;
-  const btn = el('button', 'btn-connect', 'Connect Workfront');
-  btn.addEventListener('click', () => {
-    // Redirect URI is the Runtime action itself — a fixed, domain-independent
-    // URL registered once with Workfront. It exchanges the code and
-    // postMessages the tokens back to this page's origin (passed via `state`).
-    const url = `https://${WF_DOMAIN}/integrations/oauth2/authorize?`
-      + `client_id=${WF_CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(RUNTIME_URL)}`
-      + `&state=${encodeURIComponent(location.origin)}`;
-    window.open(url, '_blank', 'width=620,height=720');
+  renderConnect() {
+    document.body.innerHTML = '';
+    const shell = el('div', 'ap-shell');
+    const header = el('div', 'ap-header');
+    header.innerHTML = '<span class="ap-logo">CAT</span><span class="ap-title">Mark Task Complete</span>';
+    const body = el('div', 'ap-connect');
+    body.innerHTML = '<p>Connect your Workfront account to mark tasks as complete.</p>';
+    const btn = el('button', 'btn-connect', 'Connect Workfront');
+    btn.addEventListener('click', () => {
+      // Redirect URI is the Runtime action itself — a fixed, domain-independent
+      // URL registered once with Workfront. It exchanges the code and
+      // postMessages the tokens back to this page's origin (passed via `state`).
+      const url = `https://${WF_DOMAIN}/integrations/oauth2/authorize?`
+        + `client_id=${WF_CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(RUNTIME_URL)}`
+        + `&state=${encodeURIComponent(window.location.origin)}`;
+      window.open(url, '_blank', 'width=620,height=720');
 
-    const onMessage = (e) => {
-      if (e.origin === RUNTIME_ORIGIN && e.data?.type === 'wf_tokens') {
-        window.removeEventListener('message', onMessage);
-        saveTokens(e.data);
-        init();
+      const onMessage = (e) => {
+        if (e.origin === RUNTIME_ORIGIN && e.data?.type === 'wf_tokens') {
+          window.removeEventListener('message', onMessage);
+          saveTokens(e.data);
+          views.init();
+        }
+      };
+      window.addEventListener('message', onMessage);
+    });
+    body.append(btn);
+    shell.append(header, body);
+    document.body.append(shell);
+  },
+
+  async renderApp() {
+    document.body.innerHTML = '';
+    const shell = el('div', 'ap-shell');
+
+    const header = el('div', 'ap-header');
+    header.innerHTML = '<span class="ap-logo">CAT</span><span class="ap-title">Mark Task Complete</span>';
+
+    const body = el('div', 'ap-body');
+
+    // Project selector
+    const projGroup = el('div');
+    const projLabel = el('div', 'ap-label', 'Project');
+    const projSelect = el('select', 'ap-select');
+    projSelect.innerHTML = '<option value="">Loading projects…</option>';
+    projGroup.append(projLabel, projSelect);
+
+    // Task area
+    const taskGroup = el('div');
+    taskGroup.style.flex = '1';
+    taskGroup.style.display = 'flex';
+    taskGroup.style.flexDirection = 'column';
+    taskGroup.style.overflow = 'hidden';
+
+    const taskLabel = el('div', 'ap-label', 'Tasks');
+    const taskSearch = el('input', 'ap-search');
+    taskSearch.placeholder = 'Filter tasks…';
+    taskSearch.type = 'search';
+    taskSearch.style.display = 'none';
+
+    const taskList = el('div', 'task-list');
+    taskList.innerHTML = '<div class="ap-empty">Select a project to see tasks</div>';
+
+    taskGroup.append(taskLabel, taskSearch, taskList);
+    body.append(projGroup, taskGroup);
+    shell.append(header, body);
+    document.body.append(shell);
+
+    // Load projects
+    let allTasks = [];
+    try {
+      const data = await api({ resource: 'projects', filter: 'member' });
+      const projects = data?.data || [];
+      if (!projects.length) {
+        projSelect.innerHTML = '<option value="">No projects found</option>';
+      } else {
+        projSelect.innerHTML = `<option value="">Select a project…</option>${
+          projects.map((p) => `<option value="${esc(p.ID)}">${esc(p.name)}</option>`).join('')}`;
       }
-    };
-    window.addEventListener('message', onMessage);
-  });
-  body.append(btn);
-  shell.append(header, body);
-  document.body.append(shell);
-}
-
-async function renderApp() {
-  document.body.innerHTML = '';
-  const shell = el('div', 'ap-shell');
-
-  const header = el('div', 'ap-header');
-  header.innerHTML = `<span class="ap-logo">CAT</span><span class="ap-title">Mark Task Complete</span>`;
-
-  const body = el('div', 'ap-body');
-
-  // Project selector
-  const projGroup = el('div');
-  const projLabel = el('div', 'ap-label', 'Project');
-  const projSelect = el('select', 'ap-select');
-  projSelect.innerHTML = '<option value="">Loading projects…</option>';
-  projGroup.append(projLabel, projSelect);
-
-  // Task area
-  const taskGroup = el('div');
-  taskGroup.style.flex = '1';
-  taskGroup.style.display = 'flex';
-  taskGroup.style.flexDirection = 'column';
-  taskGroup.style.overflow = 'hidden';
-
-  const taskLabel = el('div', 'ap-label', 'Tasks');
-  const taskSearch = el('input', 'ap-search');
-  taskSearch.placeholder = 'Filter tasks…';
-  taskSearch.type = 'search';
-  taskSearch.style.display = 'none';
-
-  const taskList = el('div', 'task-list');
-  taskList.innerHTML = `<div class="ap-empty">Select a project to see tasks</div>`;
-
-  taskGroup.append(taskLabel, taskSearch, taskList);
-  body.append(projGroup, taskGroup);
-  shell.append(header, body);
-  document.body.append(shell);
-
-  // Load projects
-  let allTasks = [];
-  try {
-    const data = await api({ resource: 'projects', filter: 'member' });
-    const projects = data?.data || [];
-    if (!projects.length) {
-      projSelect.innerHTML = '<option value="">No projects found</option>';
-    } else {
-      projSelect.innerHTML = '<option value="">Select a project…</option>'
-        + projects.map((p) => `<option value="${esc(p.ID)}">${esc(p.name)}</option>`).join('');
+    } catch {
+      projSelect.innerHTML = '<option value="">Failed to load projects</option>';
     }
-  } catch {
-    projSelect.innerHTML = '<option value="">Failed to load projects</option>';
-  }
 
-  projSelect.addEventListener('change', async () => {
-    const projectId = projSelect.value;
-    if (!projectId) {
-      taskList.innerHTML = `<div class="ap-empty">Select a project to see tasks</div>`;
+    projSelect.addEventListener('change', async () => {
+      const projectId = projSelect.value;
+      if (!projectId) {
+        taskList.innerHTML = '<div class="ap-empty">Select a project to see tasks</div>';
+        taskSearch.style.display = 'none';
+        allTasks = [];
+        return;
+      }
       taskSearch.style.display = 'none';
-      allTasks = [];
+      taskList.innerHTML = '<div class="ap-spinner">Loading tasks…</div>';
+      try {
+        const data = await api({ resource: 'tasks', projectId });
+        allTasks = data?.data || [];
+        taskSearch.value = '';
+        taskSearch.style.display = allTasks.length > 4 ? '' : 'none';
+        views.renderTasks(allTasks, taskList);
+      } catch {
+        taskList.innerHTML = '<div class="ap-empty">Failed to load tasks</div>';
+      }
+    });
+
+    taskSearch.addEventListener('input', () => {
+      const q = taskSearch.value.toLowerCase();
+      views.renderTasks(allTasks.filter((t) => t.name.toLowerCase().includes(q)), taskList);
+    });
+  },
+
+  renderTasks(tasks, container) {
+    container.innerHTML = '';
+    if (!tasks.length) {
+      container.innerHTML = '<div class="ap-empty">No tasks found</div>';
       return;
     }
-    taskSearch.style.display = 'none';
-    taskList.innerHTML = `<div class="ap-spinner">Loading tasks…</div>`;
-    try {
-      const data = await api({ resource: 'tasks', projectId });
-      allTasks = data?.data || [];
-      taskSearch.value = '';
-      taskSearch.style.display = allTasks.length > 4 ? '' : 'none';
-      renderTasks(allTasks, taskList);
-    } catch {
-      taskList.innerHTML = `<div class="ap-empty">Failed to load tasks</div>`;
-    }
-  });
+    tasks.forEach((task) => {
+      const isDone = task.status === 'CPL';
+      const item = el('div', `task-item${isDone ? ' done' : ''}`);
 
-  taskSearch.addEventListener('input', () => {
-    const q = taskSearch.value.toLowerCase();
-    renderTasks(allTasks.filter((t) => t.name.toLowerCase().includes(q)), taskList);
-  });
-}
+      const name = el('span', 'task-name', esc(task.name));
+      const tag = el('span', `task-status-tag ${isDone ? 'tag-cpl' : 'tag-other'}`, isDone ? 'Complete' : (task.status || '—'));
 
-function renderTasks(tasks, container) {
-  container.innerHTML = '';
-  if (!tasks.length) {
-    container.innerHTML = `<div class="ap-empty">No tasks found</div>`;
-    return;
-  }
-  tasks.forEach((task) => {
-    const isDone = task.status === 'CPL';
-    const item = el('div', `task-item${isDone ? ' done' : ''}`);
+      item.append(name, tag);
 
-    const name = el('span', 'task-name', esc(task.name));
-    const tag = el('span', `task-status-tag ${isDone ? 'tag-cpl' : 'tag-other'}`, isDone ? 'Complete' : (task.status || '—'));
+      if (!isDone) {
+        const btn = el('button', 'btn-complete', 'Complete');
+        btn.addEventListener('click', async () => {
+          btn.disabled = true;
+          btn.textContent = '…';
+          try {
+            await api({
+              resource: 'update_task', taskId: task.ID, status: 'CPL', percentComplete: 100,
+            });
+            task.status = 'CPL';
+            item.classList.add('done');
+            tag.textContent = 'Complete';
+            tag.className = 'task-status-tag tag-cpl';
+            btn.remove();
+            showToast(`"${task.name}" marked complete`);
+          } catch {
+            btn.disabled = false;
+            btn.textContent = 'Complete';
+            showToast('Failed to update task', 'error');
+          }
+        });
+        item.append(btn);
+      }
 
-    item.append(name, tag);
+      container.append(item);
+    });
+  },
+};
 
-    if (!isDone) {
-      const btn = el('button', 'btn-complete', 'Complete');
-      btn.addEventListener('click', async () => {
-        btn.disabled = true;
-        btn.textContent = '…';
-        try {
-          await api({ resource: 'update_task', taskId: task.ID, status: 'CPL', percentComplete: 100 });
-          task.status = 'CPL';
-          item.classList.add('done');
-          tag.textContent = 'Complete';
-          tag.className = 'task-status-tag tag-cpl';
-          btn.remove();
-          showToast(`"${task.name}" marked complete`);
-        } catch {
-          btn.disabled = false;
-          btn.textContent = 'Complete';
-          showToast('Failed to update task', 'error');
-        }
-      });
-      item.append(btn);
-    }
-
-    container.append(item);
-  });
-}
+views.init();

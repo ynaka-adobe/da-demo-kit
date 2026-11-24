@@ -15,9 +15,9 @@
 
 .commerce-products-card {
   border-top: 4px solid var(--brand-primary);
-  border-right: 1px solid rgba(152, 60, 201, 0.2);
-  border-bottom: 1px solid rgba(152, 60, 201, 0.2);
-  border-left: 1px solid rgba(152, 60, 201, 0.2);
+  border-right: 1px solid rgb(152 60 201 / 20%);
+  border-bottom: 1px solid rgb(152 60 201 / 20%);
+  border-left: 1px solid rgb(152 60 201 / 20%);
   background: #fff;
   transition: background-color 0.2s ease;
 }

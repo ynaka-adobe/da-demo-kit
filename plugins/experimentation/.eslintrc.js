@@ -18,4 +18,10 @@ module.exports = {
       js: 'always',
     }],
   },
+  overrides: [{
+    files: ['tests/**/*.js', 'playwright.config.js'],
+    rules: {
+      'import/no-extraneous-dependencies': ['error', { devDependencies: true }],
+    },
+  }],
 };

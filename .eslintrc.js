@@ -10,6 +10,9 @@ module.exports = {
     sourceType: 'module',
     requireConfigFile: false,
   },
+  settings: {
+    'import/core-modules': ['https://da.live/nx/utils/sdk.js'],
+  },
   rules: {
     'import/extensions': ['error', { js: 'always' }], // require js file extensions in imports
     'linebreak-style': ['error', 'unix'], // enforce unix linebreaks
