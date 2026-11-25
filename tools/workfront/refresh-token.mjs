@@ -10,7 +10,7 @@ const dir = dirname(fileURLToPath(import.meta.url));
 const configPath = join(dir, 'config.json');
 
 // DA_TOKEN env var required to read the private .da/ sheet
-// Get it from DevTools on da.live (Authorization: Bearer ... header)
+// Get it from DevTools on author.aem.live (Authorization: Bearer ... header)
 const daToken = process.env.DA_TOKEN;
 if (!daToken) {
   console.error('Set DA_TOKEN env var: DA_TOKEN=eyJ... node tools/workfront/refresh-token.mjs');

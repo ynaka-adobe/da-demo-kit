@@ -2,7 +2,7 @@
 
 Drop the image referenced by `../PROVISIONING.md` here:
 
-- **`da-config-permissions.png`** — a screenshot of a target org's `da.live/config` → **`permissions`** sheet
+- **`da-config-permissions.png`** — a screenshot of a target org's `author.aem.live/config` → **`permissions`** sheet
   showing an identity granted `write` on `CONFIG` and on content (`/ + **`). Example rows:
 
   | path | groups | actions | comments |

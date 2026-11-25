@@ -13,7 +13,7 @@ This specific repo has been _slightly_ modified to be compatible with DA's live 
 1. Install [AEM Code Sync](https://github.com/apps/aem-code-sync).
 
 ### 2. DA content
-1. Browse to https://da.live/start.
+1. Browse to https://author.aem.live/start.
 2. Follow the steps.
 
 ### 3. Local development
@@ -52,6 +52,21 @@ button on a hosted site. Generation requires network access to
 `experience.adobe.com`, Adobe sign-in, and access to AEM Generate Variations.
 Its authenticated generation flow must be checked with an entitled account.
 This integration does not add a DA editor **Apps** entry or modify DA configuration;
-DA Apps are separately managed at `https://da.live/config#/your-org/your-repo`.
+DA Apps are separately managed at `https://author.aem.live/config#/your-org/your-repo`.
 No DA config sync, credential copying, or customer content is needed for this
 preview Sidekick plugin.
+
+### DA authoring host
+
+Repository navigation, editor links, and config/sheet links use
+`https://author.aem.live/`, preserving their existing paths and fragments.
+The Sidekick **Document Authoring** link uses the current repository and page.
+DA API/content endpoints (`admin.da.live`, `content.da.live`) and hosted SDK,
+preview, and experimentation assets remain unchanged; this is an authoring UI
+link migration, not a service migration. Existing author context is still supplied
+by the DA SDK or Sidekick referrer, without a hard-coded author UI origin.
+
+Embedded live preview from the new author host still needs a live-service check:
+the hosted `dapreview.js` currently only permits the old DA author origin and
+development origins. Changing its download host does not change that allowlist.
+Git changes alone neither migrate DA configuration nor deploy the updated links.

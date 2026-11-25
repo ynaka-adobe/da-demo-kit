@@ -1,7 +1,7 @@
 {
   "project": "DA Block Collection",
   "editUrlLabel": "Document Authoring",
-  "editUrlPattern": "https://da.live/edit#/{{org}}/{{site}}{{pathname}}",
+  "editUrlPattern": "https://author.aem.live/edit#/{{org}}/{{site}}{{pathname}}",
   "plugins": [
     {
       "id": "aem-genai-variations",

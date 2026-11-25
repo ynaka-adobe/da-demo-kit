@@ -13,7 +13,7 @@
  *   3. Click "Download all" → opens a .json credential file
  *   4. The file contains "runtime" → { "namespace", "auth" }
  *
- * DA_TOKEN: grab from DevTools on da.live (Authorization: Bearer … header).
+ * DA_TOKEN: grab from DevTools on author.aem.live (Authorization: Bearer … header).
  */
 
 import { execSync } from 'child_process';
@@ -30,7 +30,7 @@ const runtimeNamespace = process.env.AIO_RUNTIME_NAMESPACE || '3635370-144scarle
 const runtimeApiHost = process.env.AIO_RUNTIME_APIHOST || 'https://adobeioruntime.net';
 
 if (!daToken) {
-  console.error('❌  Set DA_TOKEN env var (grab Bearer token from da.live DevTools)');
+  console.error('❌  Set DA_TOKEN env var (grab Bearer token from author.aem.live DevTools)');
   process.exit(1);
 }
 if (!runtimeAuth) {

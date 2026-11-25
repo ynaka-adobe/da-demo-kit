@@ -7,7 +7,7 @@ Universal Editor is Adobe's next-generation content editing experience that enab
 To use Universal Editor, you need:
 1. A "DX Handle" (e.g., `@nameofmycompany`) found in your experience.adobe.com URL
 2. Your IMS Org/DX Handle must have Universal Editor enabled (requires AEM Sites credits)
-3. A site on da.live
+3. A site on author.aem.live
 4. Chrome or Safari browser (currently supported browsers)
 
 See https://github.com/adobe/da-live/wiki/Universal-Editor for more details.

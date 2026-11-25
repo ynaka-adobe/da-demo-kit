@@ -5,7 +5,7 @@
  * Usage:
  *   ORG=my-org REPO=my-repo DA_TOKEN=eyJ... node tools/create-content/create-content.mjs
  *
- * DA_TOKEN: grab from DevTools on da.live (Authorization: Bearer ... request header)
+ * DA_TOKEN: grab from DevTools on author.aem.live (Authorization: Bearer ... request header)
  *
  * Templates live in tools/create-content/content/*.html
  * Each file maps to a DA page: nav.html → /{org}/{repo}/nav
@@ -67,4 +67,4 @@ for (const file of files) {
 }
 
 console.log(`\n${passed} created${failed ? `, ${failed} failed` : ''}.\n`);
-console.log(`Preview at: https://da.live/#/${ORG}/${REPO}`);
+console.log(`Preview at: https://author.aem.live/#/${ORG}/${REPO}`);

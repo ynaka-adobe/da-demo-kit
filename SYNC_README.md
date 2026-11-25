@@ -176,7 +176,7 @@ curl "https://your-site.hlx.live/actions/sync-da-sheet?targetOrg=my-org&targetRe
 **Error:** The sheet path doesn't exist in source repo
 
 **Solution:**
-1. Verify the sheet exists: `https://da.live/sheet#/ynaka-adobe/da-demo-kit/.da/adobe-target.json`
+1. Verify the sheet exists: `https://author.aem.live/sheet#/ynaka-adobe/da-demo-kit/.da/adobe-target.json`
 2. Check the exact path (case-sensitive): `.da/adobe-target.json` not `.da/adobe-target`
 3. Contact admin if the sheet should exist
 

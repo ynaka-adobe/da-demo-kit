@@ -10,7 +10,7 @@
  *   SHEET_PATH=.da/adobe-target \
  *   node tools/create-content/copy-sheet.mjs
  *
- * DA_TOKEN: grab from DevTools on da.live (Authorization: Bearer ... request header).
+ * DA_TOKEN: grab from DevTools on author.aem.live (Authorization: Bearer ... request header).
  * Needs read access on SOURCE_ORG/SOURCE_REPO and write access on DEST_ORG/DEST_REPO.
  */
 

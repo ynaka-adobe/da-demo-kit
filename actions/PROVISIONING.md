@@ -9,7 +9,7 @@ The sync actions touch **two different auth realms**, and one credential does **
 | **Config sheets** (data, library, apps, prepare) | **`admin.da.live/config`** (config store, `PUT`) | an **IMS Bearer token** — see below |
 
 `admin.da.live` has **no durable API-key system** (no `/login`, no `apiKeys` endpoint, no `WWW-Authenticate`
-challenge — it only accepts an IMS Bearer token). The da.live *session* token works but expires and can't be
+challenge — it only accepts an IMS Bearer token). The author.aem.live *session* token works but expires and can't be
 scripted. So the **durable** credential for config writes is an **IMS OAuth Server-to-Server (S2S) technical
 account**.
 
@@ -31,7 +31,7 @@ account**.
 ### 2. Grant `write` in the target org's `permissions` sheet (per target org)
 
 DA authorizes by **identity + path** in each org's **`permissions`** config sheet. The target org's owner opens
-their org config in `da.live/config`, opens the **`permissions`** sheet, and adds **four rows** — granting `write`
+their org config in `author.aem.live/config`, opens the **`permissions`** sheet, and adds **four rows** — granting `write`
 on both `CONFIG` and content (`/ + **`) to **both IMS orgs** the sync identity resolves through:
 
 | path | groups | actions | comments |
