@@ -1,46 +1,40 @@
 (function () {
   let isAEMGenAIVariationsAppLoaded = false;
+  let isAEMGenAIVariationsAppLoading = false;
+  const registeredSidekicks = new WeakSet();
+
   function loadAEMGenAIVariationsApp() {
+    isAEMGenAIVariationsAppLoading = true;
     const script = document.createElement('script');
     script.src = 'https://experience.adobe.com/solutions/aem-sites-genai-aem-genai-variations-mfe/static-assets/resources/sidekick/client.js?source=plugin';
     script.onload = function () {
       isAEMGenAIVariationsAppLoaded = true;
+      isAEMGenAIVariationsAppLoading = false;
     };
     script.onerror = function () {
+      isAEMGenAIVariationsAppLoading = false;
+      script.remove();
       console.error('Error loading AEMGenAIVariationsApp.');
     };
     document.head.appendChild(script);
   }
 
   function handlePluginButtonClick() {
-    if (!isAEMGenAIVariationsAppLoaded) {
+    if (!isAEMGenAIVariationsAppLoaded && !isAEMGenAIVariationsAppLoading) {
       loadAEMGenAIVariationsApp();
     }
   }
 
-  // The code snippet for the Sidekick V1 extension, https://chromewebstore.google.com/detail/aem-sidekick/ccfggkjabjahcjoljmgmklhpaccedipo?hl=en
-  const sidekick = document.querySelector('helix-sidekick');
-  if (sidekick) {
-    // sidekick already loaded
-    sidekick.addEventListener('custom:aem-genai-variations-sidekick', handlePluginButtonClick);
-  } else {
-    // wait for sidekick to be loaded
-    document.addEventListener('sidekick-ready', () => {
-      document.querySelector('helix-sidekick')
-        .addEventListener('custom:aem-genai-variations-sidekick', handlePluginButtonClick);
-    }, { once: true });
+  function registerSidekicks() {
+    ['helix-sidekick', 'aem-sidekick'].forEach((selector) => {
+      const sidekick = document.querySelector(selector);
+      if (sidekick && !registeredSidekicks.has(sidekick)) {
+        sidekick.addEventListener('custom:aem-genai-variations-sidekick', handlePluginButtonClick);
+        registeredSidekicks.add(sidekick);
+      }
+    });
   }
 
-  // The code snippet for the Sidekick V2 extension, https://chromewebstore.google.com/detail/aem-sidekick/igkmdomcgoebiipaifhmpfjhbjccggml?hl=en
-  const sidekickV2 = document.querySelector('aem-sidekick');
-  if (sidekickV2) {
-    // sidekick already loaded
-    sidekickV2.addEventListener('custom:aem-genai-variations-sidekick', handlePluginButtonClick);
-  } else {
-    // wait for sidekick to be loaded
-    document.addEventListener('sidekick-ready', () => {
-      document.querySelector('aem-sidekick')
-        .addEventListener('custom:aem-genai-variations-sidekick', handlePluginButtonClick);
-    }, { once: true });
-  }
+  registerSidekicks();
+  document.addEventListener('sidekick-ready', registerSidekicks);
 }());

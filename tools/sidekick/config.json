@@ -9,7 +9,7 @@
         "en": "Generate with AI"
       },
       "environments": ["preview"],
-      "includePaths": ["**.docx**"],
+      "includePaths": ["**"],
       "event": "aem-genai-variations-sidekick"
     },
     {

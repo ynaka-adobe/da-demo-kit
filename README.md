@@ -32,3 +32,26 @@ SDK is excluded; the maintained Target loader and all other JavaScript remain li
 The DA SDK's browser URL is recognized as an external module. Marketo's stylesheet
 also permits the `mkto...` class names emitted by its external Forms SDK; other
 class names still follow the standard kebab-case rule.
+
+### GenAI in Sidekick
+
+The **Generate with AI** plugin uses Adobe's hosted AEM Generate Variations
+Sidekick client, as in the Suresmile example. It is available on EDS **preview**
+pages, including DA-authored paths without a `.docx` suffix; live and production
+pages are unchanged. Install/configure AEM Sidekick for the new repository, open
+its preview page, and click **Generate with AI**. The client loads on first click
+and uses the current page URL, not a Suresmile or template-specific URL.
+
+Registration is in `tools/sidekick/config.json`; `scripts/scripts.js` imports
+`tools/sidekick/aem-genai-variations.js`, which handles both Sidekick generations.
+Run `node --test tools/sidekick/aem-genai-variations.test.mjs` to check registration,
+delayed Sidekick initialization, duplicate clicks, and load-failure retry.
+
+Deploy these Git changes through AEM Code Sync before expecting the updated
+button on a hosted site. Generation requires network access to
+`experience.adobe.com`, Adobe sign-in, and access to AEM Generate Variations.
+Its authenticated generation flow must be checked with an entitled account.
+This integration does not add a DA editor **Apps** entry or modify DA configuration;
+DA Apps are separately managed at `https://da.live/config#/your-org/your-repo`.
+No DA config sync, credential copying, or customer content is needed for this
+preview Sidekick plugin.
